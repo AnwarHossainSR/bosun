@@ -14,7 +14,7 @@ Environment switches:
   BOSUN_ENFORCE_RESULT=1   make a bosun subagent continue once if it stops without a result block
 
 The script fails open: if anything goes wrong internally it exits 0, so a bug here can never
-block your session. Standard library only; Python 3.8+.
+block your session. Standard library only; Python 3.10+ (tested in CI on 3.10 and 3.13).
 """
 from __future__ import annotations
 

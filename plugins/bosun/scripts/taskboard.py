@@ -8,7 +8,7 @@ orchestrating session should write to it. Every write is atomic and serialized
 with a lock file, so parallel invocations can't lose updates.
 
 Run `taskboard.py --help` or `taskboard.py schema` for details.
-Standard library only; Python 3.8+.
+Standard library only; Python 3.10+ (tested in CI on 3.10 and 3.13).
 """
 from __future__ import annotations
 

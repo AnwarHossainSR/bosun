@@ -1,5 +1,7 @@
 # bosun: your AI dev crew for Claude Code
 
+[![CI](https://github.com/AnwarHossainSR/bosun/actions/workflows/ci.yml/badge.svg)](https://github.com/AnwarHossainSR/bosun/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 On a ship, the bosun is the officer who runs the deck crew. bosun is a Claude Code plugin that runs a crew of agents for your day-to-day programming. It gives you:
 
 - a **manager**: one command that takes any goal and runs the right workflow;
@@ -27,7 +29,7 @@ It's generic: nothing is tied to a language or framework. Project specifics (com
 
 - **Claude Code with plugin support.** Built against, validated with and installed on Claude Code **2.1.301**. It uses plugin skills and agents, agent `model`/`effort` frontmatter, per-call worktree isolation, `SubagentStart`/`SubagentStop` hooks and the `worktree.baseRef` setting. I haven't tested older versions; they may ignore some of these.
 - **git**, for worktree isolation. Without git, bosun runs in shared mode.
-- **Python 3.8+** as `python3` on PATH, for the task board and the hooks. Without it the hooks show a non-blocking "hook error" notice and the skills fall back to editing `tasks.json` by hand.
+- **Python 3.10+** (CI tests 3.10 and 3.13) as `python3` on PATH, for the task board and the hooks. Without it the hooks show a non-blocking "hook error" notice and the skills fall back to editing `tasks.json` by hand.
 - **GitHub CLI (`gh`)**, logged in, for `review-pr` and `ship` only.
 - Tested on Linux. macOS should behave the same. Windows is untested (see Limitations).
 
@@ -241,6 +243,10 @@ python3 -m unittest discover -s tests -v
 claude plugin validate --strict ./plugins/bosun && claude plugin validate --strict .
 claude plugin details bosun      # after installing from the local marketplace
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) for reporting vulnerabilities privately.
 
 ## License
 
