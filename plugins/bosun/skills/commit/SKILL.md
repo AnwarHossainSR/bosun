@@ -41,7 +41,7 @@ Show the plan: each commit with its files and full message. Commit after the use
 
 If a hook fails, read its output. Fix purely mechanical problems (formatter, lint autofix) and retry once; otherwise stop and report. Never use `--no-verify` unless the user explicitly asks for it.
 
-`--amend` is allowed only when the last commit hasn't been pushed (`git branch -r --contains HEAD` prints nothing). Otherwise refuse and explain why.
+`--amend` is allowed only when the last commit provably hasn't been pushed. Local remote-tracking refs can be stale, so refresh them first: `git fetch --quiet <remote>` (the branch's upstream remote, usually `origin`). If the fetch fails, refuse, because the remote state can't be established. After a successful fetch, refuse if `git branch -r --contains HEAD` prints anything. With no remote configured, nothing can have been pushed and amending is fine. When you refuse, explain why.
 
 ## 7. Finish
 

@@ -36,6 +36,6 @@ Skip with `--no-review`, or when `.bosun/reviews/` already has a review of this 
 Show the base branch, title and body. After the user confirms:
 
 1. `git push -u origin <branch>`
-2. `gh pr create --base <base> --title "<title>" --body-file <file>` (add `--draft` if requested)
+2. If an open PR already exists for this branch, don't create another: report its URL, and if the user wants its description refreshed, run `gh pr edit <number> --body-file <file>`. Otherwise run `gh pr create --base <base> --title "<title>" --body-file <file>` (add `--draft` if requested).
 
 Print the PR URL and offer to check CI with `gh pr checks <number>`.

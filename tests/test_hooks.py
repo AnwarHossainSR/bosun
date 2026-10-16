@@ -215,6 +215,15 @@ class EventTests(unittest.TestCase):
         payload["stop_hook_active"] = True
         self.assertEqual(self.run_hook(payload, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 0)
 
+    def test_marker_mentioned_in_prose_is_not_a_result(self):
+        message = "I could not produce the BOSUN-RESULT block because the build crashed."
+        self.assertIsNone(hooks.parse_result(message))
+        payload = self.base("SubagentStop", last_assistant_message=message, stop_hook_active=False)
+        self.assertEqual(self.run_hook(payload).returncode, 0)
+        entry = json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
+        self.assertEqual(entry["status"], "no-result-block")
+        self.assertEqual(self.run_hook(payload, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 2)
+
     def test_no_bosun_dir_means_no_log(self):
         other = tempfile.TemporaryDirectory()
         try:

@@ -25,7 +25,9 @@ Split into areas, adjusted to the codebase (skip empty ones):
 - **data**: secrets and config, cryptography, PII and logging, error messages, security headers, CORS and CSRF;
 - **deps-infra**: dependencies and supply chain, CI workflows, containers and infrastructure as code.
 
-In one message, spawn one `bosun:security-reviewer` per area: mode `audit` with `--full`, mode `diff` otherwise (a small diff needs only one or two reviewers in total). Give each the scope (diff command or paths), its area, the attack-surface map, and the scanner leads for its area.
+With `--areas`, review only the areas listed (comma-separated names from the list above, such as `--areas auth,input`); tell the user if a listed name doesn't match one of them. Without it, review every area that applies.
+
+In one message, spawn one `bosun:security-reviewer` per selected area: mode `audit` with `--full`, mode `diff` otherwise (a small diff needs only one or two reviewers in total). Give each the scope (diff command or paths), its area, the attack-surface map, and the scanner leads for its area.
 
 ## 4. Verify
 

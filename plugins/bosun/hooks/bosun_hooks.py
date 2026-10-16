@@ -645,7 +645,7 @@ def parse_result(message: str):
         if m and m.group(1) not in result:
             value = re.sub(r"\s+#.*$", "", m.group(2)).strip().strip("'\"")
             result[m.group(1)] = value
-    return result
+    return result or None  # the marker mentioned in prose is not a result block
 
 
 def log_event(data, event: str, result=None) -> None:

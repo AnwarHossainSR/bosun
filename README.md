@@ -139,10 +139,9 @@ $ python3 plugins/bosun/scripts/taskboard.py waves examples/taskflow-40/tasks.js
 
 ### Required setting for worktree builds
 
-By default Claude Code creates agent worktrees from your repository's **default branch**, so task T07 wouldn't see T03's merged work. bosun needs worktrees created from your current HEAD:
+By default Claude Code creates agent worktrees from your repository's **default branch**, so task T07 wouldn't see T03's merged work. bosun needs worktrees created from your current HEAD. Add this to `.claude/settings.local.json`:
 
 ```json
-// .claude/settings.local.json
 { "worktree": { "baseRef": "head" } }
 ```
 
