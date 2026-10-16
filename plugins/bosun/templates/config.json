@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "project": {
+    "name": "",
+    "default_branch": "main"
+  },
+  "commands": {
+    "install": "",
+    "test": "",
+    "test_one": "",
+    "lint": "",
+    "typecheck": "",
+    "build": "",
+    "format": "",
+    "e2e": ""
+  },
+  "planning": {
+    "format": "openspec",
+    "openspec_dir": "openspec"
+  },
+  "output_style": "caveman",
+  "build": {
+    "max_parallel": 4,
+    "isolation": "worktree",
+    "review": "task",
+    "security_review": "sensitive",
+    "max_attempts": 2,
+    "merge": "merge"
+  },
+  "conventions": {
+    "commit_style": "conventional",
+    "branch_prefix": "bosun/",
+    "notes": []
+  },
+  "protected_paths": []
+}

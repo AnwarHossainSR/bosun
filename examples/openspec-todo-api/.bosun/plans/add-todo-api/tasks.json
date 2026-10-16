@@ -1,0 +1,101 @@
+{
+  "name": "add-todo-api",
+  "title": "Todo API with user accounts",
+  "version": 1,
+  "meta": {
+    "openspec_change": "add-todo-api",
+    "max_parallel": 3
+  },
+  "tasks": [
+    {
+      "id": "1.1",
+      "title": "Scaffold the API project, tooling, CI and README",
+      "agent": "implementer",
+      "deps": [],
+      "files": ["package.json", "tsconfig.json", "src/server.ts", "src/app.ts", ".github/workflows/", "README.md"],
+      "acceptance": ["`npm test` and `npm run lint` pass", "GET /health returns 200", "README setup steps run as written"],
+      "size": "M",
+      "risk": "low"
+    },
+    {
+      "id": "1.2",
+      "title": "Shared types, session interface and database schema",
+      "agent": "implementer",
+      "deps": ["1.1"],
+      "files": ["src/types/", "src/db/", "migrations/"],
+      "acceptance": ["the first migration applies to an empty database", "types compile"],
+      "size": "S",
+      "risk": "medium"
+    },
+    {
+      "id": "2.1",
+      "title": "Sign-up with salted password hashes",
+      "agent": "implementer",
+      "deps": ["1.2"],
+      "files": ["src/auth/signup.ts", "src/auth/passwords.ts", "src/routes/auth/signup.ts", "tests/auth/signup.test.ts"],
+      "acceptance": ["scenario tests pass: valid sign-up, email already registered, password too short"],
+      "spec_refs": ["user-accounts#Sign up with email and password"],
+      "size": "M",
+      "risk": "high",
+      "security_sensitive": true
+    },
+    {
+      "id": "2.2",
+      "title": "Login and session tokens",
+      "agent": "implementer",
+      "deps": ["2.1"],
+      "files": ["src/auth/login.ts", "src/auth/sessions.ts", "src/routes/auth/login.ts", "tests/auth/login.test.ts"],
+      "acceptance": ["scenario tests pass: correct credentials, wrong password"],
+      "spec_refs": ["user-accounts#Log in with email and password"],
+      "size": "M",
+      "risk": "high",
+      "security_sensitive": true
+    },
+    {
+      "id": "2.3",
+      "title": "Session middleware and auth docs",
+      "agent": "implementer",
+      "deps": ["2.2"],
+      "files": ["src/middleware/session.ts", "tests/middleware/session.test.ts", "docs/auth.md"],
+      "acceptance": ["scenario tests pass: missing token, expired token"],
+      "spec_refs": ["user-accounts#Protected endpoints require a session"],
+      "size": "S",
+      "risk": "medium",
+      "security_sensitive": true
+    },
+    {
+      "id": "3.1",
+      "title": "Create and list todo items with owner checks",
+      "agent": "implementer",
+      "deps": ["1.2"],
+      "files": ["src/todos/repository.ts", "src/routes/todos/create.ts", "src/routes/todos/list.ts", "tests/todos/create-list.test.ts"],
+      "acceptance": ["scenario tests pass: valid title, empty title, items listed newest first, another user's item"],
+      "spec_refs": ["todo-items#Create todo item", "todo-items#List own todo items", "todo-items#Todo items are private"],
+      "size": "M",
+      "risk": "medium",
+      "security_sensitive": true
+    },
+    {
+      "id": "3.2",
+      "title": "Update, complete and delete todo items, and todo docs",
+      "agent": "implementer",
+      "deps": ["3.1"],
+      "files": ["src/routes/todos/update.ts", "src/routes/todos/delete.ts", "tests/todos/update-delete.test.ts", "docs/todos.md"],
+      "acceptance": ["scenario tests pass: mark done, delete, another user's item"],
+      "spec_refs": ["todo-items#Update and complete todo item", "todo-items#Delete todo item", "todo-items#Todo items are private"],
+      "size": "M",
+      "risk": "medium",
+      "security_sensitive": true
+    },
+    {
+      "id": "4.1",
+      "title": "End-to-end test of accounts and the todo lifecycle",
+      "agent": "test-engineer",
+      "deps": ["2.3", "3.2"],
+      "files": ["tests/e2e/"],
+      "acceptance": ["the e2e test passes against a local server three runs in a row"],
+      "size": "S",
+      "risk": "low"
+    }
+  ]
+}
