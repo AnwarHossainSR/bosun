@@ -220,7 +220,17 @@ Agent reports flow into the manager's context, and the manager's updates flow to
 | `caveman-ultra` | telegraphic; common abbreviations |
 | `normal` | unchanged |
 
-`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text costs about 130 tokens per agent start. I haven't measured the savings: they depend on how much prose a task produces, and the style only shortens prose, not code, diffs, tool output or the structured result blocks. It works independently of any caveman-style skill you may use in your own sessions.
+`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text adds roughly 150-200 tokens per agent start (estimated from its length).
+
+How much it saves, measured on a small sample: agents wrote four typical bosun messages (an implementer result, review findings, an investigation report, a progress update) in normal prose; other agents rewrote each one at every level with these rules, and separate agents checked each rewrite for lost facts.
+
+| `output_style` | Fewer words in the prose | Fewer words in the whole message (with the result block) |
+|---|---|---|
+| `caveman-lite` | about 11% | about 8% |
+| `caveman` | about 25% | about 20% |
+| `caveman-ultra` | about 27% | about 21% |
+
+No real facts were lost; the checkers flagged only minor wording losses, such as a dropped count that the listed ids still show. Treat the numbers as rough: four messages, one rewrite each, and words are only a proxy for tokens. They also cover only what agents write. Most tokens in agent work are usually input (instructions, files, tool output), which this style doesn't change, so the saving on a whole session is much smaller. It works independently of any caveman-style skill you may use in your own sessions.
 
 ## Safety model
 
@@ -291,7 +301,7 @@ Verified while building this:
 - the git commands the build skill prescribes were run in a scratch repository (worktrees, `--no-ff` merges, `--no-commit` merge plus tasks.md tick in one commit, merge revert unticking it, aborting a squash merge, path-limited commits for shared mode, cleanup after squash);
 - with OpenSpec 1.14.2: the example change passes `openspec validate --strict`; an archive round trip (all tasks ticked, `openspec archive`, `openspec validate --specs --strict`) works; and `spec-check` was compared with `openspec validate` and `openspec archive` on deliberately broken changes.
 
-**Not verified: a full live multi-agent build**, and how many tokens the terse output style saves. A build runs real Claude sessions on your account, so I didn't start one. Try it first on a small throwaway repository. LLM agents follow instructions imperfectly; the gates and the verifier reduce mistakes but don't remove them. Review the merged result before you ship.
+**Not verified: a full live multi-agent build**, and the terse style's savings on real builds (only the small sample above was measured). A build runs real Claude sessions on your account, so I didn't start one. Try it first on a small throwaway repository. LLM agents follow instructions imperfectly; the gates and the verifier reduce mistakes but don't remove them. Review the merged result before you ship.
 
 Known limitations:
 - Worktree mode needs `worktree.baseRef: "head"`. Each worktree installs its own dependencies, which is slow for large JS projects.
