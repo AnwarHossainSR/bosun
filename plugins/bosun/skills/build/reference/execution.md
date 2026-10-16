@@ -16,7 +16,7 @@ Use it when the repository isn't a git repository, when the user prefers it, or 
 - Always pass `--strict-files` to `TB next`, so tasks without declared files run alone.
 - Implementers edit the main checkout and never stage or commit. The bosun guard hook enforces this for bosun agents.
 - Reviewers get `git diff -- <task files>` plus the task's untracked files (`git status --porcelain -- <paths>`).
-- When the gate passes, commit only that task's files: `git add -- <files>`, then `git commit -m "bosun(<ID>): <title>" -- <files>`.
+- When the gate passes and the fast checks are green, record the task first (`TB set <board> <ID> --status done --summary "..."`; for an OpenSpec plan this ticks tasks.md), then commit only that task's files plus tasks.md: `git add -- <files> [<tasks.md>]`, then `git commit -m "bosun(<ID>): <title>" -- <files> [<tasks.md>]`, then `TB set <board> <ID> --commit <sha>`.
 - Tests run by one agent can see other agents' half-finished edits. Treat red results during a busy wave with suspicion: re-run the checks once the wave settles before failing a task.
 
 ## Review policies
@@ -41,7 +41,9 @@ Never resolve a conflict by throwing away one side wholesale without understandi
 ## Resume details
 
 - `TB status <board>` and `git worktree list` show what survived the interruption. A task in `review` with a branch gets gated again. An `in_progress` task with commits on its branch is a partial result: spawn an implementer to finish it, starting with `git merge <task_branch>`.
-- If the work branch contains a merge for a task the board doesn't mark done (the session stopped between merging and `TB set`), mark it done with that merge's sha.
+- If the work branch contains a merge for a task the board doesn't mark done (the session stopped between committing and `TB set --commit`), mark it done with that merge's sha.
+- A merge still in progress (`git rev-parse -q --verify MERGE_HEAD` succeeds, or `git status` shows staged squash changes) means the session stopped between `git merge --no-commit` and `git commit`. Run the integration check again, then either commit it (after `TB set <board> <ID> --status done`) or undo it with `git merge --abort` (`git reset --merge` after a squash) and set the task back to `review`.
+- OpenSpec plans: `TB status <board>` reports tasks.md drift; `TB sync <board>` repairs it, then commit tasks.md.
 - Recent agent activity: `TB activity <board> --tail 30`.
 
 ## Agent teams (optional)

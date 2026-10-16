@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews a diff through one assigned lens (correctness, design, performance, tests, accessibility, api-compat, or a custom checklist) and returns evidence-backed findings with severity and confidence. Read-only. Dispatched by bosun review, review-pr and build gates; also usable directly to review recent changes.
+description: Reviews a diff through one assigned lens (correctness, spec, design, performance, tests, accessibility, api-compat, or a custom checklist) and returns evidence-backed findings with severity and confidence. Read-only. Dispatched by bosun review, review-pr and build gates; also usable directly to review recent changes.
 tools: Read, Grep, Glob, Bash
 model: inherit
 effort: high
@@ -22,6 +22,7 @@ The prompt gives you the exact diff command (for example `git diff <base>...<hea
 
 ## Lens checklists
 - **correctness**: logic and boundary errors; null/undefined; wrong conditions; error handling and propagation; async (missing await, unhandled rejection, races, double execution); resource leaks; transaction boundaries; idempotency; dates and time zones; numeric precision; encoding; shared state mutation; partial failure; compatibility with stored data.
+- **spec** (OpenSpec plans): every scenario of the requirements in scope is implemented and has a test that asserts its THEN outcome; WHEN conditions match the code paths; error and authorization scenarios are enforced, not just tested; no behavior that contradicts a requirement; MODIFIED and REMOVED requirements leave no stale behavior. Read the requirement blocks from the brief or from the change's `specs/`. A scenario without a test is a finding.
 - **design**: fit with the existing architecture and conventions; duplication of existing utilities; wrong abstraction level; leaky boundaries; misleading names; dead code; needless complexity; public API shape; testability.
 - **performance**: N+1 queries; missing indexes for new queries; unbounded loops, memory or payloads; synchronous I/O on hot paths; repeated work that should be cached (and whether invalidation is correct); excessive re-renders; chatty network calls.
 - **tests**: acceptance criteria actually asserted; edge and error cases; meaningful assertions; flakiness (time, randomness, order, network); over-mocking that hides bugs; tests that cannot fail.

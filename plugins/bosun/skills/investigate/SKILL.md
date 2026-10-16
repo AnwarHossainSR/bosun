@@ -8,6 +8,8 @@ argument-hint: "<symptom, error message, failing test or issue link> [--fix]"
 
 Problem: $ARGUMENTS
 
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+
 ## 1. Frame the problem
 
 Collect what already exists before asking: error text and stack traces, the failing test or command, logs, the issue (`gh issue view <n>` for a GitHub issue), recent changes (`git log --oneline -20`, `git log --since="2 weeks ago" -- <suspect paths>`). Write down: expected versus actual behavior; where (environment, versions); since when (last known good commit or release); how often (always, intermittent, under load); and the blast radius. Ask the user only for what you can't find, and don't stall: start with what you have.

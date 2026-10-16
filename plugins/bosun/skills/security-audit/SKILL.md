@@ -8,6 +8,8 @@ argument-hint: "[--full | <base>...<head>] [--areas auth,input,data,deps-infra] 
 
 Scope: $ARGUMENTS
 
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+
 ## 1. Scope
 
 - **Default (diff)**: the same target as the `bosun:review` skill (this branch against its base, plus uncommitted work).

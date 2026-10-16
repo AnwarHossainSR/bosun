@@ -3,7 +3,7 @@
 
 Wired up in hooks/hooks.json for these events:
   PreToolUse (Bash, Edit, Write, NotebookEdit)  guard: deny risky actions by bosun subagents
-  SubagentStart (bosun:*)                     log the start; inject the project profile
+  SubagentStart (bosun:*)                     log the start; inject the project profile and output style
   SubagentStop  (bosun:*)                     log the BOSUN-RESULT status
 
 Scope: only tool calls made inside a bosun subagent (agent_type "bosun:...") are checked.
@@ -12,6 +12,7 @@ Your main session and every other agent pass through untouched.
 Environment switches:
   BOSUN_GUARD=0            turn the guard off
   BOSUN_ENFORCE_RESULT=1   make a bosun subagent continue once if it stops without a result block
+  BOSUN_OUTPUT_STYLE=...   override output_style from .bosun/config.json for this session
 
 The script fails open: if anything goes wrong internally it exits 0, so a bug here can never
 block your session. Standard library only; Python 3.10+ (tested in CI on 3.10 and 3.13).
@@ -90,6 +91,24 @@ INFRA = {
     "pulumi": {"up", "update", "destroy", "import", "cancel", "state"},
 }
 RELEASE_SCRIPT = re.compile(r"^(deploy|publish|release)([:._-]|$)")
+OPENSPEC_ENTRIES = ("changes/", "specs/", "config.yaml", "project.md", "AGENTS.md")
+
+# Terse "caveman" output for agent reports: fewer output tokens for the manager to read.
+STYLE_LEVELS = {
+    "caveman-lite": "Prose: no filler, pleasantries or hedging words. Short, complete sentences.",
+    "caveman": "Prose: terse fragments. Drop articles, filler, pleasantries and hedging words. "
+               "Short words. One point per line.",
+    "caveman-ultra": "Prose: telegraphic fragments only. Abbreviate common words (cfg, fn, impl, deps, req, err). "
+                     "Use -> for cause and next step.",
+}
+STYLE_RULES = (
+    "Keep exact: code, commands, paths, identifiers, error text, numbers, versions.",
+    "Write normally: code comments, commit messages, PR text, docs, OpenSpec files, user-facing strings.",
+    "Use plain full sentences for security warnings, destructive or irreversible steps, ordered instructions "
+    "and questions.",
+    "Never drop a fact to save words: keep every failure and every uncertainty label "
+    "(unverified, not run, assumption).",
+)
 
 
 # ----------------------------------------------------------------------------- shell parsing
@@ -621,11 +640,18 @@ def check_path(file_path: str, data, agent: str):
         return "editing git internals is not allowed."
     if rel in (".claude/settings.json", ".claude/settings.local.json"):
         return "agents must not change Claude Code settings or permissions; ask the user."
-    if rel.startswith(".bosun/") and not rel.startswith(".bosun/scratch/") \
-            and agent.split(":")[-1] != "architect":
+    architect = agent.split(":")[-1] == "architect"
+    if rel.startswith(".bosun/") and not rel.startswith(".bosun/scratch/") and not architect:
         return ("the plan and task board belong to the manager. Put scratch files in .bosun/scratch/ "
                 "and report changes in your BOSUN-RESULT instead.")
-    for pattern in load_config(project_dir(data)).get("protected_paths") or []:
+    cfg = load_config(project_dir(data))
+    planning = cfg.get("planning") if isinstance(cfg.get("planning"), dict) else {}
+    spec_dir = strip_dot_slash(normalize(str(planning.get("openspec_dir") or "openspec"))).strip("/") or "openspec"
+    if not architect and any(rel == f"{spec_dir}/{entry}" or (entry.endswith("/") and rel.startswith(f"{spec_dir}/{entry}"))
+                             for entry in OPENSPEC_ENTRIES):
+        return ("OpenSpec files (proposal, specs, design, tasks.md) are the agreed spec; only the architect "
+                "changes them, and the manager ticks tasks.md. Report spec gaps in your BOSUN-RESULT instead.")
+    for pattern in cfg.get("protected_paths") or []:
         if isinstance(pattern, str) and matches(rel, pattern):
             return f"{rel} is a protected path in .bosun/config.json; ask the user before changing it."
     return None
@@ -675,11 +701,31 @@ def log_event(data, event: str, result=None) -> None:
         pass
 
 
+def output_style(cfg) -> str:
+    value = str(os.environ.get("BOSUN_OUTPUT_STYLE") or cfg.get("output_style") or "caveman").strip().lower()
+    return value if value in STYLE_LEVELS or value == "normal" else "caveman"
+
+
+def style_context(style: str):
+    if style not in STYLE_LEVELS:
+        return None
+    lines = [f"[bosun] Output style: {style} (output_style in .bosun/config.json; normal turns it off).",
+             f"- {STYLE_LEVELS[style]}"]
+    lines += [f"- {rule}" for rule in STYLE_RULES]
+    return "\n".join(lines)
+
+
 def build_context(data):
     root = project_dir(data)
-    if not root:
-        return None
     cfg = load_config(root)
+    style = style_context(output_style(cfg))
+    profile = project_profile(root, cfg) if root else None
+    if profile and style:
+        return profile[:MAX_CONTEXT_CHARS - len(style) - 2] + "\n\n" + style
+    return profile or style
+
+
+def project_profile(root, cfg):
     lines = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
     commands = cfg.get("commands") or {}
     shown = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]

@@ -134,6 +134,17 @@ class PathRuleTests(unittest.TestCase):
         self.assertIsNotNone(self.check(".claude/settings.local.json"))
         self.assertIsNotNone(self.check(".bosun/plans/x/tasks.json"))
 
+    def test_openspec_files_belong_to_the_architect(self):
+        for rel in ("openspec/changes/add-x/tasks.md", "openspec/specs/auth/spec.md", "openspec/config.yaml"):
+            self.assertIsNotNone(self.check(rel), rel)
+            self.assertIsNotNone(self.check(rel, worktree=True), rel)
+            self.assertIsNone(self.check(rel, agent="bosun:architect"), rel)
+        self.assertIsNone(self.check("openspec/notes.txt"))
+        self.assertIsNone(self.check("src/openspec/changes/x.ts"))
+        (self.root / ".bosun" / "config.json").write_text(json.dumps({"planning": {"openspec_dir": "./docs/openspec/"}}))
+        self.assertIsNotNone(self.check("docs/openspec/changes/add-x/proposal.md"))
+        self.assertIsNone(self.check("openspec/changes/add-x/proposal.md"))
+
     def test_allowed_paths(self):
         self.assertIsNone(self.check("src/app.ts"))
         self.assertIsNone(self.check("src/app.ts", worktree=True))
@@ -156,7 +167,8 @@ class EventTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def run_hook(self, payload, env=None):
-        full_env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root), **(env or {}))
+        base = {k: v for k, v in os.environ.items() if k not in ("BOSUN_OUTPUT_STYLE", "BOSUN_GUARD")}
+        full_env = dict(base, CLAUDE_PROJECT_DIR=str(self.root), **(env or {}))
         return subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(payload), capture_output=True,
                               text=True, env=full_env, timeout=30)
 
@@ -195,8 +207,22 @@ class EventTests(unittest.TestCase):
         out = json.loads(proc.stdout)["hookSpecificOutput"]
         self.assertEqual(out["hookEventName"], "SubagentStart")
         self.assertIn("test: pnpm test", out["additionalContext"])
+        self.assertIn("Output style: caveman", out["additionalContext"])
         log = (self.root / ".bosun" / "activity.jsonl").read_text().splitlines()
         self.assertEqual(json.loads(log[-1])["event"], "start")
+
+    def test_output_style_levels(self):
+        def context(env=None):
+            proc = self.run_hook(self.base("SubagentStart"), env)
+            return json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"] if proc.stdout else ""
+        self.assertIn("telegraphic", context({"BOSUN_OUTPUT_STYLE": "caveman-ultra"}))
+        self.assertIn("Output style: caveman (", context({"BOSUN_OUTPUT_STYLE": "shouting"}))
+        cfg = json.loads((self.root / ".bosun" / "config.json").read_text())
+        (self.root / ".bosun" / "config.json").write_text(json.dumps(dict(cfg, output_style="normal")))
+        plain = context()
+        self.assertIn("test: pnpm test", plain)
+        self.assertNotIn("Output style", plain)
+        self.assertIn("caveman-lite", context({"BOSUN_OUTPUT_STYLE": "caveman-lite"}))
 
     def test_stop_parses_result_block(self):
         message = ("Implemented.\n\n```yaml\n# BOSUN-RESULT\nagent: implementer\ntask: T07\n"
@@ -224,12 +250,21 @@ class EventTests(unittest.TestCase):
         self.assertEqual(entry["status"], "no-result-block")
         self.assertEqual(self.run_hook(payload, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 2)
 
-    def test_no_bosun_dir_means_no_log(self):
+    def test_no_bosun_dir_means_no_log_and_style_only(self):
         other = tempfile.TemporaryDirectory()
         try:
             payload = self.base("SubagentStart", cwd=other.name)
+            env = {k: v for k, v in os.environ.items() if k != "BOSUN_OUTPUT_STYLE"}
             proc = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(payload), capture_output=True,
-                                  text=True, env=dict(os.environ, CLAUDE_PROJECT_DIR=other.name), timeout=30)
+                                  text=True, env=dict(env, CLAUDE_PROJECT_DIR=other.name), timeout=30)
+            self.assertEqual(proc.returncode, 0)
+            context = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+            self.assertIn("Output style: caveman", context)
+            self.assertNotIn("Project profile", context)
+            self.assertFalse((Path(other.name) / ".bosun").exists())
+            proc = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(payload), capture_output=True,
+                                  text=True, env=dict(env, CLAUDE_PROJECT_DIR=other.name, BOSUN_OUTPUT_STYLE="normal"),
+                                  timeout=30)
             self.assertEqual((proc.returncode, proc.stdout), (0, ""))
         finally:
             other.cleanup()

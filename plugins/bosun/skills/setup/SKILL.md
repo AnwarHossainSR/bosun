@@ -1,6 +1,6 @@
 ---
 name: setup
-description: One-time bosun setup for the current repository. Detects the stack and its install, test, lint, typecheck and build commands, writes .bosun/config.json, keeps .bosun/ and agent worktrees out of git, and checks the worktree setting that parallel agents need. Run before the first /bosun:build in a repo, or when the commands change.
+description: One-time bosun setup for the current repository. Detects the stack and its install, test, lint, typecheck and build commands, OpenSpec, and the planning format and output style to use, writes .bosun/config.json, keeps .bosun/ and agent worktrees out of git, and checks the worktree setting that parallel agents need. Run before the first /bosun:build in a repo, or when the commands change.
 argument-hint: "[--force]"
 disable-model-invocation: true
 ---
@@ -10,6 +10,8 @@ disable-model-invocation: true
 Arguments: $ARGUMENTS
 
 Configure this repository for bosun. Change nothing before showing the user what you'll change; ask once for the whole batch.
+
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 ## 1. Inspect (read-only)
 
@@ -21,18 +23,22 @@ Configure this repository for bosun. Change nothing before showing the user what
   - Go `go.mod`, Rust `Cargo.toml`, JVM `pom.xml` or `build.gradle(.kts)` and wrappers, Ruby `Gemfile`, PHP `composer.json`, .NET `*.sln`/`*.csproj`. Anything else: say so and ask.
   Record a command only if it really exists (the script, target or tool is there).
 - **Commit convention.** `git log --format=%s -30` plus any commitlint config: conventional, gitmoji, ticket-prefix, or freeform.
+- **OpenSpec.** Whether `openspec/` exists (config.yaml, specs/, changes/), `command -v openspec` and `openspec --version`. The CLI is optional for planning and building, and required for `/bosun:archive`. It sends anonymous usage statistics unless `OPENSPEC_TELEMETRY=0` (or `DO_NOT_TRACK=1`) is set; tell the user before they install it.
 - **Protected paths to suggest.** CI workflows, applied migrations, generated or vendored code, secret files, release config.
 
 ## 2. Propose `.bosun/config.json`
 
 Start from `${CLAUDE_PLUGIN_ROOT}/templates/config.json`. Fill in exact command strings; `test_one` uses `{path}` for a single test file (for example `pnpm vitest run {path}`). Leave unknown commands as `""`. Defaults: `build.max_parallel` 4 (3 for heavy test suites or small machines), `isolation` `worktree` (`shared` outside git), `review` `task`, `security_review` `sensitive`, `max_attempts` 2, `merge` `merge`.
 
+- `planning.format`: `openspec` (default; plans are OpenSpec changes with requirements and scenarios) or `plan` (classic PLAN.md). `planning.openspec_dir`: `openspec` unless the repository keeps OpenSpec elsewhere.
+- `output_style`: `caveman` (default; terse agent reports and updates, so fewer output tokens), `caveman-lite`, `caveman-ultra`, or `normal`. It shortens prose only: code, commits, PR text, docs and specs are written normally. Savings depend on the work; don't promise a number.
+
 ## 3. Propose git hygiene
 
 `.bosun/` holds plans, reports, logs and scratch files; `.claude/worktrees/` holds agent worktrees. Neither should show up as untracked files. Offer one of:
 - (recommended) append both to `.git/info/exclude`: local only, nothing to commit;
 - add both to `.gitignore`: shared with the team.
-If the team wants plans in version control, they can ignore `.bosun/*` but keep `!.bosun/plans/`.
+If the team wants plans in version control, they can ignore `.bosun/*` but keep `!.bosun/plans/`. Never ignore `openspec/`: the specs and archived changes are meant to be committed.
 
 ## 4. Worktree base (important)
 

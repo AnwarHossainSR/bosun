@@ -19,6 +19,8 @@ python3 -m unittest discover -s tests -v
 claude plugin validate --strict . && claude plugin validate --strict ./plugins/bosun
 ```
 
+Optional: `npm install -g @fission-ai/openspec@1.14.2` enables the test that runs OpenSpec's own validator on the example change (it's skipped when the CLI is missing). Set `OPENSPEC_TELEMETRY=0` to turn off OpenSpec's anonymous usage statistics.
+
 Try your working copy without installing it:
 
 ```bash
@@ -41,7 +43,7 @@ claude plugin install bosun@bosun-marketplace
 | `plugins/bosun/scripts/taskboard.py` | Task board CLI used by the skills (standard library only) |
 | `plugins/bosun/hooks/` | Guard, activity log and context injection for bosun agents |
 | `tests/` | Unit tests for the task board and the hooks |
-| `examples/` | Example plans |
+| `examples/` | Example plans: `taskflow-40` (classic PLAN.md) and `openspec-todo-api` (OpenSpec change + board) |
 
 ## Guidelines
 
@@ -55,6 +57,7 @@ claude plugin install bosun@bosun-marketplace
 - Standard library only, Python 3.10+.
 - The hooks must fail open: an internal error exits 0 so a bug never blocks a user's session.
 - Every guard rule needs tests for a command it blocks and a similar command it must allow.
+- The OpenSpec readers in `taskboard.py` follow OpenSpec's own parsers. When you change one, add a fixture test and check the same fixture with the real `openspec validate` (and `openspec archive` for delta rules), so bosun never reports something OpenSpec accepts as an error, or the reverse, without saying why.
 
 **Commits and pull requests**
 - Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `ci:`...).

@@ -5,9 +5,11 @@
 On a ship, the bosun is the officer who runs the deck crew. bosun is a Claude Code plugin that runs a crew of agents for your day-to-day programming. It gives you:
 
 - a **manager**: one command that takes any goal and runs the right workflow;
+- **spec-driven planning**: plans are [OpenSpec](https://github.com/Fission-AI/OpenSpec)-format changes (proposal, requirements with testable scenarios, design, tasks.md), and every task is traced to the requirements it implements;
 - **10 specialist agents**: architect, scout, implementer, test-engineer, docs-writer, code-reviewer, security-reviewer, verifier, investigator, monitor;
-- **workflows**: plan, build, status, investigate, review, review a PR, security audit, commit, ship;
-- a **deterministic task board** (a small Python CLI) that schedules dozens of tasks across parallel agents by dependency and file ownership;
+- **workflows**: plan, build, status, archive, investigate, review, review a PR, security audit, commit, ship;
+- a **deterministic task board** (a small Python CLI) that schedules dozens of tasks across parallel agents by dependency and file ownership, and keeps the spec's tasks.md in step;
+- **terse output** ("caveman" style) for agent reports and status updates, to spend fewer tokens on prose;
 - **safety hooks** that apply only to bosun's own agents.
 
 It's generic: nothing is tied to a language or framework. Project specifics (commands, conventions, protected paths) live in `.bosun/config.json`.
@@ -15,10 +17,12 @@ It's generic: nothing is tied to a language or framework. Project specifics (com
 ```
 /bosun:manager "<any goal>"
    │
-   ├─ plan ........ scouts ║ → architect → critique (architect ║ security) → PLAN.md + tasks.json → you approve
-   ├─ build ....... pool of N implementers, each in its own git worktree
-   │                 every task: code-reviewer ║ security-reviewer → verifier (if doubtful) → merge → checks
-   │                 monitor agent every ~10 tasks · hooks log every agent · board on disk, resumable
+   ├─ plan ........ scouts ║ → architect → OpenSpec change (proposal, specs, design, tasks.md) + tasks.json
+   │                 → spec-check + openspec validate → critique (architect ║ security) → you approve
+   ├─ build ....... pool of N implementers, each in its own git worktree, each brief quoting its requirements
+   │                 every task: code-reviewer (correctness ║ spec) ║ security-reviewer → verifier (if doubtful)
+   │                 → merge + tick tasks.md → checks · monitor every ~10 tasks · board on disk, resumable
+   ├─ archive ..... (only when you run it) openspec archive → requirements merged into openspec/specs/
    ├─ investigate . investigators on competing hypotheses ║ → verifier → report (+ test-first fix)
    ├─ review / review-pr / security-audit ... lens reviewers ║ → verifier → one ranked report
    └─ commit → ship (only when you run it) → pull request
@@ -31,6 +35,7 @@ It's generic: nothing is tied to a language or framework. Project specifics (com
 - **git**, for worktree isolation. Without git, bosun runs in shared mode.
 - **Python 3.10+** (CI tests 3.10 and 3.13) as `python3` on PATH, for the task board and the hooks. Without it the hooks show a non-blocking "hook error" notice and the skills fall back to editing `tasks.json` by hand.
 - **GitHub CLI (`gh`)**, logged in, for `review-pr` and `ship` only.
+- **OpenSpec CLI (optional)**: `npm install -g @fission-ai/openspec`. Planning and building work without it (bosun's own `spec-check` validates the change); with it, bosun also runs `openspec validate --strict`, and `/bosun:archive` needs it. Tested with OpenSpec **1.14.2**. Note: the OpenSpec CLI sends anonymous usage statistics unless you set `OPENSPEC_TELEMETRY=0` (or `DO_NOT_TRACK=1`); bosun's skills set `OPENSPEC_TELEMETRY=0` on the commands they run.
 - Tested on Linux. macOS should behave the same. Windows is untested (see Limitations).
 
 ## Install
@@ -55,7 +60,7 @@ claude plugin install bosun@bosun-marketplace
 claude --plugin-dir /path/to/bosun/plugins/bosun
 ```
 
-Check it loaded: `claude plugin details bosun` should list Skills (11), Agents (10), Hooks (3).
+Check it loaded: `claude plugin details bosun` should list Skills (12), Agents (10), Hooks (3).
 
 ## First run in a project
 
@@ -64,9 +69,11 @@ Check it loaded: `claude plugin details bosun` should list Skills (11), Agents (
                                     and set worktree.baseRef = "head" (required for parallel builds; see below)
 (start a new session if setup changed worktree.baseRef)
 /bosun:plan a team task tracker with workspaces, kanban board and email notifications
+                                  writes openspec/changes/<id>/ + the task board; you review and approve
 /bosun:build                      runs the approved plan with parallel agents
 /bosun:status --audit             any time, from the same session
 /bosun:review                     final multi-lens review
+/bosun:archive                    merge the finished change into openspec/specs/ (needs the OpenSpec CLI)
 /bosun:commit
 /bosun:ship                       push and open the PR (asks first)
 ```
@@ -83,11 +90,12 @@ Or hand anything to the manager and let it route:
 | Command | What it does |
 |---|---|
 | `/bosun:manager <goal>` | Triage any goal: picks plan/build, investigate, review, audit, an ad-hoc crew, or a single agent for small changes. |
-| `/bosun:plan <idea>` | Clarifying questions, parallel scouts, architect writes `PLAN.md` + `tasks.json`, architecture and security critique, your approval. |
-| `/bosun:build [plan]` | Executes a board: rolling pool of N agents in worktrees, review and security gates, merge, checks, monitor, resume (`--resume`), `--parallel`, `--review task\|batch\|final`, `--dry-run`. |
+| `/bosun:plan <idea>` | Clarifying questions, parallel scouts, the architect writes an OpenSpec change (proposal, specs with scenarios, design, tasks.md) and the task board, validation, architecture and security critique, your approval. `--classic` writes `PLAN.md` instead; naming an existing change only adds the board. |
+| `/bosun:build [plan]` | Executes a board: rolling pool of N agents in worktrees, review, spec and security gates, merge, tasks.md ticks, checks, monitor, resume (`--resume`), `--parallel`, `--review task\|batch\|final`, `--dry-run`. |
+| `/bosun:archive [id]` | Checks every task is done and the change validates, runs `openspec archive`, re-validates the main specs, commits after you confirm. Only runs when you type it. |
 | `/bosun:status [--audit]` | Dashboard: progress, in flight, blocked, next, recent agent activity; `--audit` adds the monitor agent's health check. |
 | `/bosun:investigate <symptom>` | Frame, reproduce, 2-5 hypotheses, one investigator per hypothesis in parallel, verifier, written report; `--fix` fixes test-first. |
-| `/bosun:review [target]` | Lens reviewers in parallel (correctness, tests, security, design, performance, accessibility, api-compat), verified, de-duplicated report; `--fix`. |
+| `/bosun:review [target]` | Lens reviewers in parallel (correctness, spec, tests, security, design, performance, accessibility, api-compat), verified, de-duplicated report; `--fix`. |
 | `/bosun:review-pr <n\|url>` | Same panel on a GitHub PR, checked out in a separate worktree; posts only after you approve the text. |
 | `/bosun:security-audit [--full]` | Attack-surface map, installed scanners, security reviewers per area, verified findings, report; `--fix`. |
 | `/bosun:commit` | Splits changes into logical commits, follows your convention, checks for secrets and leftovers, runs hooks, commits after you confirm. |
@@ -100,7 +108,7 @@ The agents can also be used directly, for example "use the bosun:security-review
 
 | Agent | Role | Writes | Model / effort |
 |---|---|---|---|
-| `architect` | PLAN.md + task board; plan critique and revision | plan files | inherit / high |
+| `architect` | OpenSpec change (or PLAN.md) + task board; plan critique and revision | plan and spec files | inherit / high |
 | `scout` | Read-only codebase map, research spikes | nothing | sonnet / medium |
 | `implementer` | One task end to end: tests first, code, checks, commit on its branch | code | inherit |
 | `test-engineer` | Unit, integration and e2e tests, flakiness checks | tests | inherit |
@@ -127,7 +135,7 @@ $ python3 plugins/bosun/scripts/taskboard.py waves examples/taskflow-40/tasks.js
 
 1. **Scheduling.** `taskboard.py next` returns tasks whose dependencies are done and whose owned files don't overlap anything in flight, longest critical path first. Overlap checks are conservative: a false conflict costs parallelism, never correctness.
 2. **Rolling pool.** The manager keeps N agents busy (`--parallel`, default 4). Each code task runs in its own git worktree on its own branch. When an agent finishes, its gate starts immediately and the next ready task takes the free slot. There's no waiting for a whole wave.
-3. **Gate per task.** A code-reviewer (correctness, plus tests for high-risk tasks) and a security-reviewer for sensitive tasks run in parallel. Doubtful blocking findings go to the verifier. Fix rounds go back to the same implementer. Then merge with `--no-ff`, fast checks, and the full suite every ~5 merges. A red merge is undone with `git revert`, never a reset.
+3. **Gate per task.** A code-reviewer (correctness; spec for tasks with requirements; tests for high-risk tasks) and a security-reviewer for sensitive tasks run in parallel. Doubtful blocking findings go to the verifier. Fix rounds go back to the same implementer. Then `git merge --no-ff --no-commit`, fast checks on the merged tree, and only then the commit (which also carries the tasks.md tick). The full suite runs every ~5 merges; a merge that turns it red is undone with `git revert`, never a reset.
 4. **Monitoring.**
    - Claude Code notifies the manager as each background agent finishes.
    - The hooks append every bosun agent's start and stop (with its result status) to `.bosun/activity.jsonl`.
@@ -147,6 +155,58 @@ By default Claude Code creates agent worktrees from your repository's **default 
 
 `/bosun:setup` offers to add it, and `/bosun:build` checks it. Without it, build runs in shared mode: all agents in one checkout with strict file ownership, and the manager commits per task.
 
+## Spec-driven plans (OpenSpec format)
+
+`/bosun:plan` writes the plan as an [OpenSpec](https://github.com/Fission-AI/OpenSpec) change, so the "what" is agreed before any code exists and every task can be traced back to it:
+
+```text
+openspec/
+  config.yaml                          schema: spec-driven (created if missing)
+  specs/<capability>/spec.md           current behavior; changes only when a change is archived
+  changes/<change-id>/
+    .openspec.yaml                     schema and creation date
+    proposal.md                        why, what changes, capabilities, impact
+    specs/<capability>/spec.md         delta: ADDED / MODIFIED / REMOVED / RENAMED requirements
+    design.md                          context, decisions, risks, migration plan
+    tasks.md                           "- [ ] 1.1 ..." checklist, ticked by the build
+.bosun/plans/<change-id>/tasks.json    the board: same task ids, plus deps, file ownership, agents
+```
+
+Each requirement states what the system SHALL do, and its scenarios become tests:
+
+```markdown
+### Requirement: Todo items are private
+The system SHALL NOT reveal, change or delete a todo item for anyone but its owner, and SHALL answer such requests as if the item did not exist.
+
+#### Scenario: Another user's item
+- **WHEN** user A reads, updates or deletes an item owned by user B
+- **THEN** the system returns 404 and the item is unchanged
+```
+
+How bosun uses it:
+- **Traceability.** Each board task lists the requirements it implements in `spec_refs` (`"todo-items#Todo items are private"`). `taskboard.py spec-check` fails when an ADDED or MODIFIED requirement has no task, a reference doesn't resolve, or tasks.md and the board disagree. It also catches common format mistakes: no SHALL/MUST, a scenario written with three `#`, prose that archiving would drop, a MODIFIED block that loses scenarios, deltas that `openspec archive` would refuse.
+- **Briefs quote the contract.** `taskboard.py brief` pastes the task's requirement blocks verbatim into the implementer's prompt. Implementers write one test per scenario, and a `spec` review lens checks every scenario against the code and the tests.
+- **Only the architect edits the spec.** The guard blocks other bosun agents from changing OpenSpec files; they report disagreements as `spec_gaps`.
+- **tasks.md stays true.** When the manager marks a task done, `taskboard.py set` ticks its line, inside the task's merge commit; reverting the merge unticks it. Follow-up tasks added during a build get a tasks.md line too.
+- **Archive.** `/bosun:archive` checks that every task is ticked (`openspec archive --yes` itself doesn't stop on unticked tasks), then lets the OpenSpec CLI merge the deltas into `openspec/specs/`.
+
+Already have an OpenSpec change, written by hand or with OpenSpec's own commands? `/bosun:plan <change-id>` only adds the board. Prefer a plain plan? Use `/bosun:plan --classic ...` or set `"planning": {"format": "plan"}`.
+
+bosun is not affiliated with OpenSpec. It writes the OpenSpec 1.x file formats, checked against the 1.14.2 CLI and its source; if a later OpenSpec release changes them, `openspec validate` is the authority. [examples/openspec-todo-api](examples/openspec-todo-api) is a small complete example that passes both `spec-check` and `openspec validate --strict`.
+
+## Terse output ("caveman" style)
+
+Agent reports flow into the manager's context, and the manager's updates flow to you. With `output_style: "caveman"` (the default), every bosun agent is told at start (by the SubagentStart hook), and every bosun skill is told in its instructions, to write prose as short fragments without filler, pleasantries or hedging words. Code, commands, paths, error text and numbers stay exact. Commit messages, PR text, docs and the specs are written normally. Security warnings, destructive steps, ordered instructions and questions get full sentences, and uncertainty labels (unverified, not run, assumption) are always kept.
+
+| `output_style` | Prose |
+|---|---|
+| `caveman` (default) | fragments; no articles, filler or pleasantries |
+| `caveman-lite` | short complete sentences; no filler |
+| `caveman-ultra` | telegraphic; common abbreviations |
+| `normal` | unchanged |
+
+`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text costs about 130 tokens per agent start. I haven't measured the savings: they depend on how much prose a task produces, and the style only shortens prose, not code, diffs, tool output or the structured result blocks. It works independently of any caveman-style skill you may use in your own sessions.
+
 ## Safety model
 
 The hooks in `hooks/hooks.json` act only when the tool call comes from a bosun agent (`agent_type` starting with `bosun:`). Your own session and other agents are never touched.
@@ -159,12 +219,13 @@ The hooks in `hooks/hooks.json` act only when the tool call comes from a bosun a
 | `gh` write actions (PR create/merge/comment/review, issues, releases, API POST/PATCH/DELETE, GraphQL mutations, `gh auth token`) | acting on GitHub as you |
 | Publishing and deploying (`npm publish`, `cargo publish`, `docker push`, `vercel --prod`, `wrangler deploy`, `npm run deploy` and similar), infrastructure changes (terraform apply, kubectl apply/delete, helm upgrade and similar), `sudo`, `curl … \| sh` | outside the machine, or unreviewed code |
 | Edits to `.git/`, `.claude/settings*.json`, `.bosun/` (except `.bosun/scratch/`; the architect may write plans) and your `protected_paths` | integrity, permission escalation, the board |
+| Edits to OpenSpec files (`openspec/changes/`, `openspec/specs/`, `openspec/config.yaml`), except by the architect | the spec is the agreed contract; the manager ticks tasks.md |
 
-Switches: `BOSUN_GUARD=0` turns the guard off. `BOSUN_ENFORCE_RESULT=1` makes a bosun agent continue once if it stops without a result block (off by default, because it could also fire when you stop an agent yourself).
+Switches: `BOSUN_GUARD=0` turns the guard off. `BOSUN_ENFORCE_RESULT=1` makes a bosun agent continue once if it stops without a result block (off by default, because it could also fire when you stop an agent yourself). `BOSUN_OUTPUT_STYLE` overrides `output_style`.
 
 The guard is a safety net against accidents, **not a security boundary**. It parses command text, so it can't see what a script does internally, and a determined agent could get around it. Keep your normal Claude Code permission settings.
 
-Other built-in brakes: `ship` and `setup` only run when you type them; `review-pr` posts only text you approved; commit never pushes; no agent installs tools or touches remote services on its own.
+Other built-in brakes: `ship`, `setup` and `archive` only run when you type them; `review-pr` posts only text you approved; commit never pushes; no agent installs tools or touches remote services on its own.
 
 ## Configuration
 
@@ -173,6 +234,9 @@ Other built-in brakes: `ship` and `setup` only run when you type them; `review-p
 | Key | Meaning | Default |
 |---|---|---|
 | `commands.install/test/test_one/lint/typecheck/build/format/e2e` | exact commands; injected into every bosun agent at start | detected |
+| `planning.format` | `openspec` (OpenSpec change + board) or `plan` (PLAN.md + board) | openspec |
+| `planning.openspec_dir` | where the OpenSpec directory lives | openspec |
+| `output_style` | `caveman`, `caveman-lite`, `caveman-ultra` or `normal` (see Terse output) | caveman |
 | `build.max_parallel` | agents in flight | 4 |
 | `build.isolation` | `worktree` or `shared` | worktree |
 | `build.review` | `task` (gate every task), `batch` (gate every N merges), `final` (final review only) | task |
@@ -199,19 +263,20 @@ Also useful:
 
 Each agent has its own context window, so multi-agent work uses **many more tokens** than one session. A 40-task build means at least 40 implementer runs, 40-80 reviewer runs, plus planning, verification and monitoring. I can't give you a reliable number. Run a small plan first and watch your usage.
 
-Levers: lower `max_parallel`; `review: batch`; implementers on `sonnet`; `--no-critique` for small plans; `/bosun:manager` already skips the crew for small changes.
+Levers: lower `max_parallel`; `review: batch`; implementers on `sonnet`; `--no-critique` for small plans; keep `output_style` terse; `/bosun:manager` already skips the crew for small changes.
 
-The plugin also adds about **2.4k tokens to every session** for the skill and agent listings (`claude plugin details bosun` shows this). Disable it in projects where you don't use it (`/plugin`).
+The plugin also adds about **2.5k tokens to every session** for the skill and agent listings (`claude plugin details bosun` shows this). Disable it in projects where you don't use it (`/plugin`).
 
 ## What has been verified, and what hasn't
 
 Verified while building this:
-- the unit tests in `tests/` pass (task board scheduling, validation, locking under concurrent writes; guard rules including false-positive cases; hook events);
+- the unit tests in `tests/` pass (task board scheduling, validation, locking under concurrent writes; OpenSpec parsing, spec-check, tasks.md ticking and sync; guard rules including false-positive cases; hook events and output styles);
 - `claude plugin validate --strict` passes for the plugin and the marketplace;
-- installing from the local marketplace loads 11 skills, 10 agents and 3 hooks on Claude Code 2.1.301;
-- the git commands the build skill prescribes were run in a scratch repository (worktrees, `--no-ff` merges, merge revert, path-limited commits for shared mode, cleanup after squash).
+- installing from the local marketplace loads 12 skills, 10 agents and 3 hooks on Claude Code 2.1.301;
+- the git commands the build skill prescribes were run in a scratch repository (worktrees, `--no-ff` merges, `--no-commit` merge plus tasks.md tick in one commit, merge revert unticking it, aborting a squash merge, path-limited commits for shared mode, cleanup after squash);
+- with OpenSpec 1.14.2: the example change passes `openspec validate --strict`; an archive round trip (all tasks ticked, `openspec archive`, `openspec validate --specs --strict`) works; and `spec-check` was compared with `openspec validate` and `openspec archive` on deliberately broken changes.
 
-**Not verified: a full live multi-agent build.** That runs real Claude sessions on your account, so I didn't start one. Try it first on a small throwaway repository. LLM agents follow instructions imperfectly; the gates and the verifier reduce mistakes but don't remove them. Review the merged result before you ship.
+**Not verified: a full live multi-agent build**, and how many tokens the terse output style saves. A build runs real Claude sessions on your account, so I didn't start one. Try it first on a small throwaway repository. LLM agents follow instructions imperfectly; the gates and the verifier reduce mistakes but don't remove them. Review the merged result before you ship.
 
 Known limitations:
 - Worktree mode needs `worktree.baseRef: "head"`. Each worktree installs its own dependencies, which is slow for large JS projects.
@@ -225,12 +290,13 @@ Known limitations:
 .claude-plugin/marketplace.json        marketplace (lists the plugin)
 plugins/bosun/
   .claude-plugin/plugin.json           plugin manifest
-  skills/<name>/SKILL.md               11 workflows (build/reference/execution.md holds edge cases)
+  skills/<name>/SKILL.md               12 workflows (build/reference/execution.md holds edge cases)
   agents/<name>.md                     10 agents
-  hooks/hooks.json + bosun_hooks.py    guard, activity log, context injection
-  scripts/taskboard.py                 task board CLI (stdlib only)
+  hooks/hooks.json + bosun_hooks.py    guard, activity log, context and output-style injection
+  scripts/taskboard.py                 task board CLI with OpenSpec checks (stdlib only)
   templates/config.json                project config template
-examples/taskflow-40/                  40-task example plan (PLAN.md + tasks.json)
+examples/taskflow-40/                  40-task example plan (classic PLAN.md + tasks.json)
+examples/openspec-todo-api/            OpenSpec example: openspec/ change + .bosun/ board
 tests/                                 unit tests
 LICENSE                                MIT
 ```
@@ -241,6 +307,7 @@ LICENSE                                MIT
 python3 -m unittest discover -s tests -v
 claude plugin validate --strict ./plugins/bosun && claude plugin validate --strict .
 claude plugin details bosun      # after installing from the local marketplace
+(cd examples/openspec-todo-api && OPENSPEC_TELEMETRY=0 openspec validate add-todo-api --strict --no-interactive)
 ```
 
 ## Contributing

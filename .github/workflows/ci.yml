@@ -33,7 +33,7 @@ jobs:
         run: python -m unittest discover -s tests -v
 
   validate:
-    name: plugin validate
+    name: validate (plugin, OpenSpec example)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,6 +49,13 @@ jobs:
         run: |
           claude plugin validate --strict .
           claude plugin validate --strict ./plugins/bosun
+      - name: Install OpenSpec CLI
+        run: npm install --global @fission-ai/openspec@1.14.2
+      - name: Validate the OpenSpec example with OpenSpec itself
+        working-directory: examples/openspec-todo-api
+        env:
+          OPENSPEC_TELEMETRY: "0"
+        run: openspec validate add-todo-api --strict --no-interactive
 
   # Single required check for branch protection: fails unless every job above succeeded.
   ci:

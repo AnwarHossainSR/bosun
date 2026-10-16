@@ -8,6 +8,8 @@ argument-hint: "<pr-number | pr-url> [--post] [--lenses ...]"
 
 Pull request: $ARGUMENTS
 
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+
 This needs the GitHub CLI: `gh auth status` must succeed. If it doesn't, explain how to authenticate (`gh auth login`) and stop. For a PR in another repository, add `--repo <owner>/<repo>` to the gh commands.
 
 ## 1. Fetch

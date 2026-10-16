@@ -18,6 +18,7 @@ import datetime as _dt
 import json
 import os
 import re
+import signal
 import sys
 import tempfile
 import time
@@ -48,7 +49,8 @@ bosun task board (tasks.json), schema v1. Annotated example; real files are plai
   "name": "todo-api",                    // required: plan slug
   "title": "Todo API with auth",         // optional human title
   "version": 1,
-  "meta": {                              // optional; the build skill fills it
+  "meta": {                              // optional; the build skill fills most of it
+    "openspec_change": "add-todo-api",   // OpenSpec plans: openspec/changes/<id>/ (see below)
     "base_branch": "main", "work_branch": "bosun/todo-api", "base_commit": "<sha>",
     "max_parallel": 4, "isolation": "worktree"
   },
@@ -63,6 +65,8 @@ bosun task board (tasks.json), schema v1. Annotated example; real files are plai
       "files": ["package.json", "src/server.ts", "src/routes/"],
                                          // ownership: files, directories ending in "/", or globs
       "acceptance": ["`npm test` passes", "GET /health returns 200"],
+      "spec_refs": ["todo-items#Create todo item"],
+                                         // OpenSpec plans: "<capability>#<Requirement name>"
       "size": "M",                       // S (<1h of human work) | M (1-3h) | L (3-6h); split bigger work
       "risk": "low",                     // low | medium | high
       "security_sensitive": false,       // auth, crypto, input parsing, secrets, permissions, payments, PII
@@ -81,6 +85,13 @@ notes, history, started_at, finished_at.
 
 Statuses: pending -> in_progress -> review -> done; also blocked, failed, skipped.
 A task is ready when it is pending and every dependency is done or skipped.
+
+OpenSpec plans (meta.openspec_change set): the change in openspec/changes/<id>/ is the spec:
+proposal.md (why), specs/<capability>/spec.md (delta requirements with scenarios), design.md
+(how) and tasks.md (checklist). Board ids are the tasks.md ids (1.1, 1.2, 2.1, ...), one
+board task per tasks.md line. Each task lists the requirements it implements in spec_refs, and
+every ADDED or MODIFIED requirement needs at least one task. `spec-check` verifies all of this;
+`set --status done` ticks the task in tasks.md and `sync` repairs drift.
 
 Planning rules
  1. One task = one agent session: a coherent change to about 1-8 files that can be tested
@@ -422,7 +433,7 @@ def validate_board(board):
             errors.append(f"{label}: missing title")
         if status_of(task) not in STATUSES:
             errors.append(f"{label}: invalid status {task.get('status')!r} (expected one of {', '.join(STATUSES)})")
-        for field in ("deps", "files", "acceptance"):
+        for field in ("deps", "files", "acceptance", "spec_refs"):
             value = task.get(field, [])
             if value is not None and not isinstance(value, list):
                 errors.append(f"{label}: '{field}' must be a list")
@@ -597,6 +608,556 @@ def default_parallel(board, board_path: Path) -> int:
     return 4
 
 
+def write_text_atomic(path: Path, text: str) -> None:
+    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.resolve().parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
+            fh.write(text)
+        with contextlib.suppress(OSError):
+            os.chmod(tmp, os.stat(path).st_mode & 0o7777)
+        os.replace(tmp, str(path))
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(tmp)
+        raise
+
+
+# ----------------------------------------------------------------------------- openspec
+# A plan can be an OpenSpec change (github.com/Fission-AI/OpenSpec): openspec/changes/<id>/
+# holds proposal.md, delta specs (specs/<capability>/spec.md), design.md and tasks.md. The
+# board then uses the task ids of tasks.md and links each task to the requirements it
+# implements through spec_refs. The readers below follow the OpenSpec 1.x formats closely
+# enough for bosun's cross-checks; `openspec validate --strict` stays the authority.
+
+OS_TASK_RE = re.compile(r"^(\s*(?:[-*+]|\d{1,9}[.)])\s*\[)([^\]]*)\](.*)$")
+OS_TASK_ID = re.compile(r"^(\d+(?:\.\d+)+(?:[A-Za-z]+)?)(?=\s|$)")
+OS_H2_ANY = re.compile(r"^ {0,3}##(?!#)(?:[ \t]+|[ \t]*$)")
+OS_GROUP = re.compile(r"^ {0,3}##[ \t]+(\d+)\.(?:[ \t]|$)")
+OS_REQ = re.compile(r"^###\s*Requirement:\s*(.+)\s*$", re.IGNORECASE)
+OS_SECTION = re.compile(r"^##\s+(.+)$")
+OS_FENCE_OPEN = re.compile(r"^\s*(`{3,}|~{3,})")
+OS_FENCE_CLOSE = re.compile(r"^\s*(`{3,}|~{3,})\s*$")
+DELTA_SECTIONS = {"added requirements": "added", "modified requirements": "modified",
+                  "removed requirements": "removed", "renamed requirements": "renamed"}
+REQ_TEXT_MAX = 500
+WHY_MIN, WHY_MAX, PURPOSE_MIN, DELTAS_MAX = 50, 1000, 50, 10
+BRIEF_SPEC_CHARS = 8000
+
+
+def group_number(value: str) -> str:
+    return re.sub(r"^0+(?=\d)", "", value)
+
+
+def os_task(line: str):
+    """(prefix, mark, rest) for a tasks.md checkbox line, else None (OpenSpec's task-line rules)."""
+    m = OS_TASK_RE.match(line)
+    if not m:
+        return None
+    inner, rest = m.group(2), m.group(3)
+    mark = inner.strip()
+    if len(mark) > 1:
+        return None
+    if rest[:1] in ("(", "[") and not (inner and not mark):
+        return None  # a link such as "- [x](url)", not a task
+    return m.group(1), inner, rest
+
+
+def parse_tasks_md(text: str):
+    """Task lines of a tasks.md in order: {id, done, text, line, group}. id is None when absent."""
+    tasks, group = [], None
+    for number, line in enumerate(re.split(r"\r?\n", text), 1):
+        if OS_H2_ANY.match(line):
+            g = OS_GROUP.match(line)
+            group = g.group(1) if g else None
+            continue
+        parsed = os_task(line)
+        if not parsed:
+            continue
+        desc = parsed[2].strip()
+        m = OS_TASK_ID.match(desc)
+        tasks.append({"id": m.group(1) if m else None, "done": parsed[1].strip().lower() == "x",
+                      "text": desc[m.end():].strip() if m else desc, "line": number, "group": group})
+    return tasks
+
+
+def mark_tasks_md(path: Path, wanted, dry_run: bool = False):
+    """Tick (True) or untick (False) task lines by id. Returns (changed ids, ids with no line)."""
+    with open(path, encoding="utf-8", newline="") as fh:
+        lines = fh.read().splitlines(keepends=True)
+    changed, seen = [], set()
+    for i, raw in enumerate(lines):
+        body = raw.rstrip("\r\n")
+        parsed = os_task(body)
+        m = OS_TASK_ID.match(parsed[2].strip()) if parsed else None
+        if not m or m.group(1) not in wanted:
+            continue
+        tid = m.group(1)
+        seen.add(tid)
+        if (parsed[1].strip().lower() == "x") == wanted[tid]:
+            continue
+        lines[i] = parsed[0] + ("x" if wanted[tid] else " ") + "]" + parsed[2] + raw[len(body):]
+        if tid not in changed:
+            changed.append(tid)
+    if changed and not dry_run:
+        write_text_atomic(path, "".join(lines))
+    return changed, [t for t in wanted if t not in seen]
+
+
+def append_task_line(path: Path, tid: str, title: str) -> None:
+    """Add "- [ ] <id> <title>" to the end of group N of tasks.md (N = the id's first number)."""
+    with open(path, encoding="utf-8", newline="") as fh:
+        text = fh.read()
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = re.split(r"\r?\n", text)
+    group = group_number(tid.split(".")[0])
+    insert_at, in_group, follow_up = None, False, None
+    for i, line in enumerate(lines):
+        if OS_H2_ANY.match(line):
+            g = OS_GROUP.match(line)
+            in_group = bool(g) and group_number(g.group(1)) == group
+            if in_group:
+                insert_at = i + 1
+            elif follow_up is None and re.match(r"^ {0,3}##[ \t]+workflow follow-up[ \t]*$", line, re.IGNORECASE):
+                follow_up = i
+            continue
+        if in_group and os_task(line):
+            insert_at = i + 1
+    entry = f"- [ ] {tid} {title}"
+    if insert_at is not None:
+        lines.insert(insert_at, entry)
+    else:  # new group, kept before an optional "## Workflow follow-up" section
+        at = follow_up if follow_up is not None else len(lines)
+        while at > 0 and not lines[at - 1].strip():
+            at -= 1
+        gap = follow_up is not None and at == follow_up  # no blank line left before the follow-up section
+        lines[at:at] = ["", f"## {group}. Follow-up", "", entry] + ([""] if gap else [])
+    write_text_atomic(path, newline.join(lines).rstrip("\r\n") + newline)
+
+
+def md_lines(text: str):
+    return text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+
+def fence_mask(lines):
+    """True for lines inside fenced code blocks (fence lines included)."""
+    mask, active = [False] * len(lines), None
+    for i, line in enumerate(lines):
+        if active is None:
+            m = OS_FENCE_OPEN.match(line)
+            if m:
+                active = (m.group(1)[0], len(m.group(1)))
+                mask[i] = True
+            continue
+        mask[i] = True
+        m = OS_FENCE_CLOSE.match(line)
+        if m and m.group(1)[0] == active[0] and len(m.group(1)) >= active[1]:
+            active = None
+    return mask
+
+
+def md_sections(lines, mask):
+    """[(title, body_start, body_end)] for every unfenced "## " section."""
+    heads = []
+    for i, line in enumerate(lines):
+        m = None if mask[i] else OS_SECTION.match(line)
+        if m:
+            heads.append((i, m.group(1).strip()))
+    return [(title, i + 1, heads[n + 1][0] if n + 1 < len(heads) else len(lines))
+            for n, (i, title) in enumerate(heads)]
+
+
+def req_name(raw: str) -> str:
+    return re.sub(r"[ \t]+#+[ \t]*$", "", raw).strip()
+
+
+def requirement_block(name, block, bmask, path, line, section):
+    body, bm = block[1:], bmask[1:]
+    text, metadata = [], []
+    for raw, fenced in zip(body, bm):
+        if fenced:
+            continue
+        if re.match(r"^#{1,6}\s", raw):
+            break
+        stripped = raw.strip()
+        if stripped:
+            (metadata if re.match(r"^\*\*[^*]+\*\*:", stripped) else text).append(stripped)
+    scenarios, empty = [], 0
+    for k, raw in enumerate(body):
+        if bm[k] or not re.match(r"^####\s+", raw):
+            continue
+        end = k + 1
+        while end < len(body) and (bm[end] or not re.match(r"^#{1,4}\s", body[end])):
+            end += 1
+        if "\n".join(body[k + 1:end]).strip():
+            scenarios.append(re.sub(r"^####\s+(?:Scenario:\s*)?", "", raw, flags=re.IGNORECASE).strip())
+        else:
+            empty += 1
+    misleveled = sum(1 for raw, fenced in zip(body, bm)
+                     if not fenced and re.match(r"^#{1,3}\s*Scenario\b", raw, re.IGNORECASE))
+    return {"name": name, "section": section, "path": path, "line": line,
+            "text": "\n".join(text or metadata), "scenarios": scenarios, "empty_scenarios": empty,
+            "misleveled_scenarios": misleveled, "raw": "\n".join(block).rstrip()}
+
+
+def requirement_blocks(lines, mask, start, end, path, section):
+    blocks, i = [], start
+    while i < end:
+        m = None if mask[i] else OS_REQ.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        j = i + 1
+        while j < end and (mask[j] or not OS_REQ.match(lines[j])):
+            j += 1
+        blocks.append(requirement_block(req_name(m.group(1)), lines[i:j], mask[i:j], path, i + 1, section))
+        i = j
+    return blocks
+
+
+def section_text(lines, mask, start, end) -> str:
+    return "\n".join(lines[i] for i in range(start, end)).strip()
+
+
+def parse_main_spec(text: str, path: str):
+    lines = md_lines(text)
+    mask = fence_mask(lines)
+    spec = {"purpose": "", "requirements": {}}
+    for title, start, end in md_sections(lines, mask):
+        if title.lower() == "requirements":
+            for block in requirement_blocks(lines, mask, start, end, path, "main"):
+                spec["requirements"].setdefault(block["name"], block)
+        elif title.lower() == "purpose":
+            spec["purpose"] = section_text(lines, mask, start, end)
+    return spec
+
+
+def parse_delta(text: str, path: str):
+    """Parse a delta spec: ADDED/MODIFIED blocks, REMOVED entries, RENAMED pairs, plus mistakes."""
+    lines = md_lines(text)
+    mask = fence_mask(lines)
+    sections = md_sections(lines, mask)
+    delta = {"path": path, "purpose": None, "added": [], "modified": [], "removed": [], "renamed": [],
+             "present": set(), "unpaired": [], "orphans": [], "stray_text": []}
+    # comments blanked out, fenced text kept: what OpenSpec's archive would silently drop
+    plain = "\n".join("" if mask[i] else line for i, line in enumerate(lines))
+    plain = re.sub(r"<!--[\s\S]*?(?:--!?>|\Z)", lambda m: re.sub(r"[^\n]", " ", m.group(0)), plain).split("\n")
+    visible = [lines[i] if mask[i] else plain[i] for i in range(len(lines))]
+    first = sections[0][1] - 1 if sections else len(lines)
+    delta["orphans"] += requirement_blocks(lines, mask, 0, first, path, "orphan")
+    if any(visible[i].strip() and not re.match(r"^#\s", visible[i]) for i in range(first)):
+        delta["stray_text"].append("text above the first '## ' section")
+    for title, start, end in sections:
+        key = title.lower()
+        kind = DELTA_SECTIONS.get(key)
+        if kind:
+            delta["present"].add(kind)
+        if kind in ("added", "modified"):
+            delta[kind] += requirement_blocks(lines, mask, start, end, path, kind)
+            stop = next((i for i in range(start, end) if not mask[i] and OS_REQ.match(lines[i])), end)
+            if any(visible[i].strip() and not re.match(r"^###\s", visible[i]) for i in range(start, stop)):
+                delta["stray_text"].append(f"text before the first requirement in '## {title}'")
+        elif kind == "removed":
+            for block in requirement_blocks(lines, mask, start, end, path, "removed"):
+                block["reason"] = bool(re.search(r"\*\*Reason\*\*", block["raw"]))
+                block["migration"] = bool(re.search(r"\*\*Migration\*\*", block["raw"]))
+                delta["removed"].append(block)
+            for i in range(start, end):
+                m = None if mask[i] else re.match(r"^\s*[-*+]\s*`?###\s*Requirement:\s*(.+?)`?\s*$", lines[i])
+                if m:
+                    delta["removed"].append({"name": req_name(m.group(1)), "section": "removed", "path": path,
+                                             "line": i + 1, "raw": lines[i].strip(), "bullet": True})
+        elif kind == "renamed":
+            pending = None
+            for i in range(start, end):
+                if mask[i]:
+                    continue
+                f = re.match(r"^\s*[-*+]?\s*FROM:\s*`?###\s*Requirement:\s*(.+?)`?\s*$", lines[i])
+                t = re.match(r"^\s*[-*+]?\s*TO:\s*`?###\s*Requirement:\s*(.+?)`?\s*$", lines[i])
+                if f:
+                    if pending:
+                        delta["unpaired"].append(("FROM", pending[0]))
+                    pending = (req_name(f.group(1)), i + 1)
+                elif t and pending:
+                    delta["renamed"].append({"from": pending[0], "to": req_name(t.group(1)), "line": pending[1]})
+                    pending = None
+                elif t:
+                    delta["unpaired"].append(("TO", req_name(t.group(1))))
+            if pending:
+                delta["unpaired"].append(("FROM", pending[0]))
+        elif key == "purpose":
+            delta["purpose"] = section_text(lines, mask, start, end)
+        else:
+            delta["orphans"] += requirement_blocks(lines, mask, start, end, path, "orphan")
+            if any(visible[i].strip() for i in range(start, end)):
+                delta["stray_text"].append(f"section '## {title}'")
+    return delta
+
+
+def read_text(path: Path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def openspec_change(board, board_path: Path):
+    """Locate the OpenSpec change linked by meta.openspec_change, or None for a classic plan."""
+    meta = board.get("meta") or {}
+    change_id = meta.get("openspec_change")
+    if not change_id:
+        return None
+    if not isinstance(change_id, str) or not ID_RE.match(change_id):
+        die(f"meta.openspec_change {change_id!r} is not a valid change id")
+    root = bosun_dir_for(board_path).parent
+    planning = read_config(board_path).get("planning")
+    base = Path(str(meta.get("openspec_dir") or (planning.get("openspec_dir") if isinstance(planning, dict) else None)
+                    or "openspec"))
+    base = base if base.is_absolute() else root / base
+    change_dir = base / "changes" / change_id
+    archived = None
+    if not change_dir.is_dir():
+        pattern = re.compile(r"^\d{4}-\d{2}-\d{2}-" + re.escape(change_id) + "$")
+        found = sorted(p for p in (base / "changes" / "archive").glob(f"*-{change_id}") if pattern.match(p.name))
+        archived = found[-1] if found else None
+    return {"id": change_id, "base": base, "dir": change_dir, "tasks_md": change_dir / "tasks.md",
+            "archived": archived}
+
+
+def load_change(info):
+    """Read proposal, tasks.md and every delta spec (with its main spec, if any) of a change."""
+    change = dict(info, proposal=read_text(info["dir"] / "proposal.md"), tasks_text=read_text(info["tasks_md"]),
+                  meta_text=read_text(info["dir"] / ".openspec.yaml"), deltas=[], root_spec=False)
+    specs_dir = info["dir"] / "specs"
+    change["root_spec"] = (specs_dir / "spec.md").is_file()
+    if specs_dir.is_dir():
+        for spec in sorted(specs_dir.rglob("spec.md"), key=lambda p: p.as_posix()):
+            if not spec.is_file() or spec.parent == specs_dir:
+                continue
+            capability = spec.parent.relative_to(specs_dir).as_posix()
+            delta = parse_delta(read_text(spec) or "", f"specs/{capability}/spec.md")
+            delta["capability"] = capability
+            main_text = read_text(info["base"] / "specs" / capability / "spec.md")
+            delta["main"] = parse_main_spec(main_text, capability) if main_text is not None else None
+            change["deltas"].append(delta)
+    change["skip_specs"] = bool(re.search(r"(?m)^skip_specs:\s*true\s*(#.*)?$", change["meta_text"] or "",
+                                          re.IGNORECASE))
+    return change
+
+
+def spec_requirements(change):
+    """{"<capability>#<name>": requirement} for everything a task may reference."""
+    out = {}
+    for delta in change["deltas"]:
+        for kind in ("added", "modified", "removed"):
+            for req in delta[kind]:
+                out.setdefault(f"{delta['capability']}#{req['name']}", req)
+        for pair in delta["renamed"]:
+            out.setdefault(f"{delta['capability']}#{pair['to']}",
+                           {"name": pair["to"], "section": "renamed", "path": delta["path"], "line": pair["line"],
+                            "raw": f"RENAMED FROM: {pair['from']} TO: {pair['to']}", "scenarios": []})
+    return out
+
+
+def spec_refs_of(task):
+    refs = task.get("spec_refs") or []
+    return [r.strip() for r in refs if isinstance(r, str) and r.strip()] if isinstance(refs, list) else []
+
+
+def proposal_sections(text: str):
+    lines = md_lines(text)
+    mask = fence_mask(lines)
+    return {title.lower(): section_text(lines, mask, start, end) for title, start, end in md_sections(lines, mask)}
+
+
+def spec_check(board, board_path: Path):
+    """Cross-check a board against its OpenSpec change. Returns (errors, warnings, report)."""
+    info = openspec_change(board, board_path)
+    if info is None:
+        return ["board has no meta.openspec_change, so it is not linked to an OpenSpec change"], [], {}
+    if not info["dir"].is_dir():
+        where = f"; it was archived to {info['archived']}" if info["archived"] else ""
+        return [f"change directory not found: {info['dir']}{where}"], [], {"change": info["id"]}
+    change = load_change(info)
+    errors, warnings = [], []
+    report = {"change": info["id"], "dir": str(info["dir"]), "requirements": 0, "coverage": {}, "uncovered": [],
+              "tasks_md": {"total": 0, "ticked": 0}}
+
+    # proposal.md (openspec archive only warns about these; bosun reports them the same way)
+    if change["proposal"] is None:
+        errors.append("proposal.md is missing")
+    else:
+        sections = proposal_sections(change["proposal"])
+        why = sections.get("why", "")
+        if not why:
+            warnings.append("proposal.md: '## Why' is missing or empty")
+        elif not WHY_MIN <= len(why) <= WHY_MAX:
+            warnings.append(f"proposal.md: '## Why' has {len(why)} characters; OpenSpec expects {WHY_MIN}-{WHY_MAX}")
+        if not sections.get("what changes"):
+            warnings.append("proposal.md: '## What Changes' is missing or empty")
+
+    # delta specs
+    if change["root_spec"]:
+        errors.append("specs/spec.md has no capability folder; move it to specs/<capability>/spec.md")
+    if change["skip_specs"] and change["deltas"]:
+        errors.append("skip_specs is set in .openspec.yaml but spec files exist under specs/")
+    deltas_total = 0
+    for delta in change["deltas"]:
+        where = delta["path"]
+        main = delta["main"]
+        entries = sum(len(delta[k]) for k in ("added", "modified", "removed", "renamed"))
+        deltas_total += entries
+        if not delta["present"]:
+            errors.append(f"{where}: no delta sections (## ADDED/MODIFIED/REMOVED/RENAMED Requirements)")
+        elif not entries:
+            errors.append(f"{where}: delta sections contain no '### Requirement:' entries")
+        for text in delta["stray_text"]:
+            errors.append(f"{where}: {text} is not carried into the main spec by archive; "
+                          "move it into a requirement, proposal.md or design.md")
+        for orphan in delta["orphans"]:
+            errors.append(f"{where}:{orphan['line']}: requirement {orphan['name']!r} is outside the delta sections")
+        for side, name in delta["unpaired"]:
+            errors.append(f"{where}: RENAMED {side}: {name!r} has no matching {'TO' if side == 'FROM' else 'FROM'}: line")
+        seen = {}
+        for kind in ("added", "modified"):
+            for req in delta[kind]:
+                label = f"{where}:{req['line']}: {kind.upper()} {req['name']!r}"
+                if req["name"] in seen.get(kind, set()):
+                    errors.append(f"{label} is duplicated")
+                seen.setdefault(kind, set()).add(req["name"])
+                if not req["text"]:
+                    errors.append(f"{label} has no requirement text")
+                elif not re.search(r"\b(SHALL|MUST)\b", req["text"]):
+                    errors.append(f"{label}: requirement text needs SHALL or MUST")
+                if kind == "added" and len(req["text"]) > REQ_TEXT_MAX:
+                    errors.append(f"{label}: requirement text is {len(req['text'])} characters (max {REQ_TEXT_MAX}); "
+                                  "move detail into scenarios or split it")
+                if not req["scenarios"]:
+                    hint = " (scenarios need exactly four #: '#### Scenario: ...')" \
+                        if req["misleveled_scenarios"] or req["empty_scenarios"] else ""
+                    errors.append(f"{label} needs at least one '#### Scenario:' with content{hint}")
+        names = {k: {r["name"] for r in delta[k]} for k in ("added", "modified", "removed")}
+        for a, b in (("added", "modified"), ("added", "removed"), ("modified", "removed")):
+            for name in sorted(names[a] & names[b]):
+                errors.append(f"{where}: {name!r} is in both {a.upper()} and {b.upper()}")
+        renamed_to = {p["to"] for p in delta["renamed"]}
+        if main is None:
+            if delta["modified"] or delta["removed"] or delta["renamed"]:
+                errors.append(f"{where}: capability {delta['capability']!r} has no main spec yet, "
+                              "so it can only ADD requirements")
+            if len((delta["purpose"] or "").strip()) < PURPOSE_MIN:
+                warnings.append(f"{where}: new capability without a '## Purpose' of {PURPOSE_MIN}+ characters; "
+                                "archive would write a TBD placeholder")
+        else:
+            if delta["purpose"]:
+                warnings.append(f"{where}: '## Purpose' in a delta is used only when a capability is created; "
+                                "edit the main spec's Purpose instead")
+            existing = set(main["requirements"])
+            for req in delta["added"]:
+                if req["name"] in existing:
+                    errors.append(f"{where}: ADDED {req['name']!r} already exists in the main spec "
+                                  "(archive would refuse); use MODIFIED")
+            for req in delta["modified"]:
+                current = main["requirements"].get(req["name"])
+                if current is None and req["name"] not in renamed_to:
+                    errors.append(f"{where}: MODIFIED {req['name']!r} does not exist in the main spec "
+                                  "(archive would refuse)")
+                elif current is not None:
+                    lost = list(current["scenarios"])
+                    for name in req["scenarios"]:
+                        if name in lost:
+                            lost.remove(name)
+                    if lost:
+                        errors.append(f"{where}: MODIFIED {req['name']!r} drops scenario(s) "
+                                      f"{', '.join(repr(s) for s in lost)}; MODIFIED replaces the whole block and "
+                                      "archive refuses to drop scenarios, so copy them in")
+            for req in delta["removed"]:
+                if req["name"] not in existing:
+                    warnings.append(f"{where}: REMOVED {req['name']!r} does not exist in the main spec, "
+                                    "so archive removes nothing")
+                elif not req.get("bullet") and not (req.get("reason") and req.get("migration")):
+                    warnings.append(f"{where}: REMOVED {req['name']!r} should state **Reason** and **Migration**")
+            for pair in delta["renamed"]:
+                if pair["from"] not in existing:
+                    errors.append(f"{where}: RENAMED FROM {pair['from']!r} does not exist in the main spec "
+                                  "(archive would refuse)")
+                if pair["to"] in existing:
+                    errors.append(f"{where}: RENAMED TO {pair['to']!r} already exists in the main spec "
+                                  "(archive would refuse)")
+    if not change["deltas"] and not change["skip_specs"] and not change["root_spec"]:
+        errors.append("no delta specs under specs/; add specs/<capability>/spec.md, "
+                      "or set skip_specs: true in .openspec.yaml for a change with no behavior change")
+    if deltas_total > DELTAS_MAX:
+        warnings.append(f"{deltas_total} requirement deltas; OpenSpec suggests splitting changes with more than "
+                        f"{DELTAS_MAX} (archive shows a warning)")
+
+    # board <-> requirements
+    idx = index_tasks(board)
+    reqs = spec_requirements(change)
+    lowered = {k.lower(): k for k in reqs}
+    report["requirements"] = len(reqs)
+    for tid in sorted(idx, key=natural_key):
+        for ref in spec_refs_of(idx[tid]):
+            if ref in reqs:
+                report["coverage"].setdefault(ref, []).append(tid)
+            elif "#" not in ref:
+                errors.append(f"{tid}: spec_ref {ref!r} must look like '<capability>#<Requirement name>'")
+            else:
+                hint = f" (did you mean {lowered[ref.lower()]!r}?)" if ref.lower() in lowered else ""
+                errors.append(f"{tid}: spec_ref {ref!r} matches no requirement in the change{hint}")
+    for ref, req in reqs.items():
+        if ref in report["coverage"]:
+            continue
+        if req["section"] in ("added", "modified"):
+            report["uncovered"].append(ref)
+            errors.append(f"requirement {ref!r} ({req['section'].upper()}) is not covered by any task's spec_refs")
+        elif req["section"] == "removed":
+            warnings.append(f"REMOVED requirement {ref!r} has no task removing the behavior")
+
+    # board <-> tasks.md
+    if change["tasks_text"] is None:
+        errors.append("tasks.md is missing")
+    else:
+        lines = parse_tasks_md(change["tasks_text"])
+        report["tasks_md"] = {"total": len(lines), "ticked": sum(1 for t in lines if t["done"])}
+        listed = {}
+        for entry in lines:
+            if entry["id"] is None:
+                warnings.append(f"tasks.md:{entry['line']}: task line without an id ('- [ ] N.M ...'); "
+                                "bosun cannot track it")
+            elif entry["id"] in listed:
+                errors.append(f"tasks.md:{entry['line']}: task id {entry['id']} appears twice")
+            else:
+                listed[entry["id"]] = entry
+                if entry["group"] and group_number(entry["id"].split(".")[0]) != group_number(entry["group"]):
+                    errors.append(f"tasks.md:{entry['line']}: task {entry['id']} sits under group {entry['group']}")
+        for tid in sorted(set(listed) - set(idx), key=natural_key):
+            errors.append(f"tasks.md task {tid} is not on the board, so the build would never run it")
+        for tid in sorted(set(idx) - set(listed), key=natural_key):
+            errors.append(f"board task {tid} has no line in tasks.md")
+        stale = [tid for tid in sorted(set(idx) & set(listed), key=natural_key)
+                 if status_of(idx[tid]) != "skipped" and listed[tid]["done"] != (status_of(idx[tid]) == "done")]
+        if stale:
+            warnings.append(f"tasks.md checkboxes differ from the board for {', '.join(stale)}; run `sync`")
+    return errors, warnings, report
+
+
+def tick_tasks_md(board, board_path: Path, wanted) -> None:
+    """Mirror board status changes into tasks.md for OpenSpec plans; never fails the caller."""
+    info = openspec_change(board, board_path)
+    if info is None or not wanted:
+        return
+    if not info["tasks_md"].is_file():
+        why = f"the change was archived to {info['archived']}" if info["archived"] else f"{info['tasks_md']} not found"
+        print(f"note: {why}; tasks.md checkboxes not updated", file=sys.stderr)
+        return
+    changed, missing = mark_tasks_md(info["tasks_md"], wanted)
+    for tid in changed:
+        print(f"{'ticked' if wanted[tid] else 'unticked'} {tid} in {info['tasks_md']}")
+    if missing:
+        print(f"note: no tasks.md line for {', '.join(missing)}", file=sys.stderr)
+
+
 # ----------------------------------------------------------------------------- scheduling
 
 def plan_next(board, parallel: int, strict_files: bool = False):
@@ -693,6 +1254,8 @@ def cmd_init(args) -> int:
     plan_dir.mkdir(parents=True, exist_ok=True)
     board = {"name": args.slug, "title": args.title or args.slug, "version": 1,
              "meta": {"created_at": now_iso()}, "tasks": []}
+    if args.openspec_change:
+        board["meta"]["openspec_change"] = args.openspec_change
     save_board(path, board)
     print(path)
     return 0
@@ -763,11 +1326,14 @@ def cmd_set(args) -> int:
         if missing:
             die(f"unknown task id(s): {', '.join(missing)}")
         stamp = now_iso()
+        ticks = {}
         for tid in args.ids:
             task = idx[tid]
             old = status_of(task)
             if args.status and args.status != old:
                 new = args.status
+                if new != "skipped":
+                    ticks[tid] = new == "done"
                 task["status"] = new
                 if new in INFLIGHT and old not in INFLIGHT:
                     task["attempts"] = int(task.get("attempts") or 0) + (1 if new == "in_progress" else 0)
@@ -791,6 +1357,7 @@ def cmd_set(args) -> int:
                 task.setdefault("notes", []).append(f"{stamp} {args.note}")
         board.setdefault("meta", {})["updated_at"] = stamp
         save_board(path, board)
+        tick_tasks_md(board, path, ticks)
     if args.status:
         print(f"{', '.join(args.ids)} -> {args.status}")
     else:
@@ -814,6 +1381,13 @@ def cmd_add(args) -> int:
             die(f"task {args.id} already exists")
         task = {"id": args.id, "title": args.title, "agent": args.agent, "deps": split_csv(args.deps),
                 "files": split_csv(args.files), "acceptance": args.acceptance or [], "status": "pending"}
+        if args.spec_ref:
+            task["spec_refs"] = args.spec_ref
+        change = openspec_change(board, path)
+        if change and not OS_TASK_ID.fullmatch(args.id):
+            die(f"{args.id}: tasks of an OpenSpec plan use tasks.md ids such as 7.1")
+        if change and not change["tasks_md"].is_file():
+            die(f"{change['tasks_md']} not found")
         for field in ("description", "kind", "size", "risk"):
             value = getattr(args, field)
             if value:
@@ -828,6 +1402,9 @@ def cmd_add(args) -> int:
         board["tasks"].append(task)
         board.setdefault("meta", {})["updated_at"] = now_iso()
         save_board(path, board)
+        if change and not any(t["id"] == args.id for t in parse_tasks_md(read_text(change["tasks_md"]) or "")):
+            append_task_line(change["tasks_md"], args.id, args.title)
+            print(f"added '- [ ] {args.id}' to {change['tasks_md']}")
     for warn in warnings:
         if warn.startswith(args.id) or f" {args.id} " in warn:
             print(f"warning {warn}")
@@ -841,9 +1418,13 @@ def cmd_brief(args) -> int:
     idx = index_tasks(board)
     task = idx.get(args.id) or die(f"unknown task id {args.id}")
     plan_md = path.parent / "PLAN.md"
+    info = openspec_change(board, path)
     lines = [f"# Task {task['id']}: {task.get('title', '')}", ""]
     lines.append(f"- Plan: {board.get('title') or board.get('name', '')}")
-    if plan_md.is_file():
+    if info:
+        lines.append(f"- OpenSpec change (read-only for you): {info['dir']}/ "
+                     "(proposal.md = why, design.md = how, specs/ = required behavior)")
+    elif plan_md.is_file():
         lines.append(f"- PLAN.md (read the sections relevant to this task): {plan_md}")
     lines.append(f"- Board (read-only for you): {path}")
     lines.append(f"- Agent: {agent_full(agent_of(task))}   Kind: {kind_of(task)}   Size: {task.get('size', 'M')}"
@@ -852,10 +1433,31 @@ def cmd_brief(args) -> int:
     attempts = int(task.get("attempts") or 0)
     if attempts > 1:
         lines.append(f"- Attempt: {attempts}")
-    lines += ["", "## Description", "", task.get("description") or "(none; follow the title and PLAN.md)", ""]
+    fallback = "(none; follow the title, the requirements below and design.md)" if info \
+        else "(none; follow the title and PLAN.md)"
+    lines += ["", "## Description", "", task.get("description") or fallback, ""]
     lines += ["## Acceptance criteria", ""]
-    lines += [f"- [ ] {a}" for a in task.get("acceptance") or []] or ["- (none given; derive them from PLAN.md and state them in your result)"]
+    lines += [f"- [ ] {a}" for a in task.get("acceptance") or []] or ["- (none given; derive them from the plan and state them in your result)"]
     lines.append("")
+    refs = spec_refs_of(task)
+    if info and refs:
+        reqs = spec_requirements(load_change(info))
+        lines += ["## Requirements this task implements (verbatim from the change's specs)", "",
+                  "Every scenario needs a test that fails without your change; name tests after scenarios "
+                  "where the framework allows. A MODIFIED requirement replaces the old one in full.", ""]
+        blocks, budget = [], BRIEF_SPEC_CHARS
+        for ref in refs:
+            req = reqs.get(ref)
+            if req is None:
+                blocks += [f"- {ref}: NOT FOUND in the change; ask the manager", ""]
+                continue
+            header = f"From {req['path']} ({req['section'].upper()}):"
+            if len(req["raw"]) <= budget:
+                blocks += [header, "", req["raw"], ""]
+                budget -= len(req["raw"])
+            else:
+                blocks += [f"- {ref}: read it in {info['dir'] / req['path']} (line {req['line']})", ""]
+        lines += blocks
     files = files_of(task)
     lines += ["## Files you own", ""]
     if files:
@@ -891,6 +1493,44 @@ def cmd_brief(args) -> int:
     return 0
 
 
+def cmd_spec_check(args) -> int:
+    path = resolve_board(args.board)
+    board = load_board(path)
+    errors, warnings, report = spec_check(board, path)
+    if args.json:
+        emit_json(dict(report, ok=not errors, errors=errors, warnings=warnings))
+        return 1 if errors else 0
+    for err in errors:
+        print(f"ERROR   {err}")
+    for warn in warnings:
+        print(f"warning {warn}")
+    if report.get("requirements") is not None and "coverage" in report:
+        md = report["tasks_md"]
+        print(f"{'FAILED' if errors else 'OK'}: change {report['change']}: {report['requirements']} requirement(s), "
+              f"{len(report['coverage'])} covered by tasks; tasks.md {md['ticked']}/{md['total']} ticked; "
+              f"{len(errors)} errors, {len(warnings)} warnings")
+    else:
+        print(f"FAILED: {len(errors)} error(s)")
+    return 1 if errors else 0
+
+
+def cmd_sync(args) -> int:
+    path = resolve_board(args.board)
+    board = load_board(path)
+    info = openspec_change(board, path)
+    if info is None:
+        die("board has no meta.openspec_change; nothing to sync")
+    if not info["tasks_md"].is_file():
+        die(f"{info['tasks_md']} not found")
+    wanted = {t["id"]: status_of(t) == "done" for t in index_tasks(board).values() if status_of(t) != "skipped"}
+    changed, missing = mark_tasks_md(info["tasks_md"], wanted, dry_run=args.dry_run)
+    verb = "would update" if args.dry_run else "updated"
+    print(f"{verb} {len(changed)} checkbox(es) in {info['tasks_md']}" + (f": {', '.join(changed)}" if changed else ""))
+    if missing:
+        print(f"no tasks.md line for: {', '.join(missing)} (run spec-check)")
+    return 0
+
+
 def progress_bar(fraction: float, width: int = 24) -> str:
     filled = int(round(fraction * width))
     return "[" + "#" * filled + "-" * (width - filled) + "]"
@@ -914,6 +1554,18 @@ def cmd_status(args) -> int:
     recent = sorted((t for t in idx.values() if status_of(t) == "done" and t.get("finished_at")),
                     key=lambda t: t["finished_at"], reverse=True)[:5]
     meta = board.get("meta") or {}
+    spec = None
+    info = openspec_change(board, path)
+    if info:
+        live = info["dir"].is_dir()
+        md_path = info["tasks_md"] if live else (info["archived"] / "tasks.md" if info["archived"] else None)
+        md = parse_tasks_md((read_text(md_path) if md_path else None) or "")
+        ticked = {t["id"] for t in md if t["done"] and t["id"]}
+        spec = {"change": info["id"], "dir": str(info["dir"]), "exists": live,
+                "archived": str(info["archived"]) if info["archived"] else None,
+                "tasks_md_total": len(md), "tasks_md_ticked": sum(1 for t in md if t["done"]),
+                "out_of_sync": sorted((k for k, t in idx.items() if live and status_of(t) != "skipped"
+                                       and (k in ticked) != (status_of(t) == "done")), key=natural_key)}
     if args.json:
         emit_json({
             "board": str(path), "name": board.get("name"), "total": total, "counts": counts,
@@ -926,13 +1578,19 @@ def cmd_status(args) -> int:
             "ready": [s["id"] for s in nxt["start"]] if nxt else [],
             "waves_left": len(waves), "critical_path_left": critical, "unschedulable": unschedulable,
             "stuck": bool(nxt and nxt["stuck"]), "complete": bool(nxt and nxt["complete"]),
-            "meta": meta, "errors": errors,
+            "meta": meta, "errors": errors, "openspec": spec,
         })
         return 0
     print(f"Plan: {board.get('title') or board.get('name')}  ({path})")
     if meta.get("work_branch"):
         print(f"Branch: {meta.get('work_branch')} (base {meta.get('base_branch', '?')}"
               + (f" @ {str(meta['base_commit'])[:10]}" if meta.get("base_commit") else "") + ")")
+    if spec:
+        state = "" if spec["exists"] else (f" (archived: {spec['archived']})" if spec["archived"]
+                                            else " (change directory missing)")
+        print(f"OpenSpec: change {spec['change']}{state}"
+              + f"; tasks.md {spec['tasks_md_ticked']}/{spec['tasks_md_total']} ticked"
+              + (f"; out of sync: {', '.join(spec['out_of_sync'])} (run `sync`)" if spec["out_of_sync"] else ""))
     fraction = finished / total if total else 0.0
     print(f"Progress: {progress_bar(fraction)} {finished}/{total} finished ({fraction * 100:.0f}%)  "
           + "  ".join(f"{s}: {counts[s]}" for s in STATUSES if counts[s] and s not in FINISHED))
@@ -1112,6 +1770,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("init", help="create .bosun/plans/<slug>/tasks.json with no tasks")
     p.add_argument("slug")
     p.add_argument("--title")
+    p.add_argument("--openspec-change", metavar="ID", help="link the board to openspec/changes/<ID>/")
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_init)
 
@@ -1145,6 +1804,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--size", choices=("S", "M", "L"))
     p.add_argument("--risk", choices=("low", "medium", "high"))
     p.add_argument("--security-sensitive", action="store_true")
+    p.add_argument("--spec-ref", action="append", metavar="CAPABILITY#REQUIREMENT",
+                   help="requirement this task implements (repeatable; OpenSpec plans)")
 
     p = board_cmd("brief", "print a self-contained task brief to paste into an agent prompt", cmd_brief)
     p.add_argument("id")
@@ -1159,6 +1820,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
 
     board_cmd("graph", "print the dependency graph as a Mermaid flowchart", cmd_graph)
+
+    p = board_cmd("spec-check", "OpenSpec plans: check the change's specs, requirement coverage and tasks.md "
+                  "against the board", cmd_spec_check)
+    p.add_argument("--json", action="store_true")
+
+    p = board_cmd("sync", "OpenSpec plans: tick tasks.md for done tasks and untick the rest (skipped untouched)",
+                  cmd_sync)
+    p.add_argument("--dry-run", action="store_true")
 
     p = board_cmd("meta", "show board meta, or set keys with --set key=value (empty value deletes)", cmd_meta)
     p.add_argument("--set", action="append", metavar="KEY=VALUE")
@@ -1175,6 +1844,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # `taskboard.py status | head` exits quietly
     args = build_parser().parse_args(argv)
     return int(args.func(args) or 0)
 

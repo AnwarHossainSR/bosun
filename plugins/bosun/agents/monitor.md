@@ -25,6 +25,7 @@ The board path (tasks.json). The main checkout is the current directory unless t
 4. **Consistency**: tasks marked done without a commit; in-flight tasks whose worktree no longer exists; worktrees or task branches with no matching in-flight task (orphans); uncommitted changes in the main checkout during a worktree-mode build; current branch differs from `meta.work_branch`.
 5. **Throughput**: tasks finished per hour so far against the waves left; whether parallelism is used (in-flight count against `max_parallel` while tasks are ready).
 6. **Agents**: agents running according to the activity log against in-flight tasks on the board. A mismatch means lost or zombie agents.
+7. **Spec** (OpenSpec plans, `openspec` in the status JSON): tasks.md out of sync with the board (recommend `TB sync`), errors from `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py" spec-check <board>`, and task merges (`bosun(<ID>): ...` commits) that change files under `openspec/` other than tasks.md.
 
 ## Rules
 - Read-only: never edit the board, files or git state. Recommend; the manager acts.

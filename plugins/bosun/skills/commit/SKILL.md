@@ -8,6 +8,8 @@ argument-hint: "[hint about the change] [--yes] [--amend]"
 
 Arguments: $ARGUMENTS
 
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+
 ## 1. Inspect
 
 `git status --porcelain=v1 -b`, `git diff --cached --stat`, `git diff --stat`, `git ls-files --others --exclude-standard`, `git log --format=%s -20`, `git log -3 --format=%B`, the branch name (it may contain a ticket id such as ABC-123), and any commit-message config (`commitlint.config.*`, `.commitlintrc*`, `.czrc`, a `commitlint` key in package.json). If a merge, rebase or cherry-pick is in progress, say so and stop.

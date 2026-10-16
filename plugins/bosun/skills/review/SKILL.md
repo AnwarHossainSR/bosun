@@ -1,12 +1,14 @@
 ---
 name: review
-description: Multi-agent code review of local changes - uncommitted work, staged changes, a branch against its base, or a commit range. Parallel reviewers each take a lens (correctness, design, performance, tests, security), blocking findings are verified independently, and you get one de-duplicated report ranked by severity. --fix applies the confirmed fixes. Use before committing, before a PR, or after a build.
+description: Multi-agent code review of local changes - uncommitted work, staged changes, a branch against its base, or a commit range. Parallel reviewers each take a lens (correctness, spec, design, performance, tests, security), blocking findings are verified independently, and you get one de-duplicated report ranked by severity. --fix applies the confirmed fixes. Use before committing, before a PR, or after a build.
 argument-hint: "[staged | working | <base>...<head> | <commit>] [--lenses correctness,tests,security,...] [--fix]"
 ---
 
 # bosun review
 
 Target: $ARGUMENTS
+
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 ## 1. Resolve the target
 
@@ -17,12 +19,13 @@ Show the `--stat`. If there's nothing to review, say so and stop.
 
 ## 2. Context
 
-Commit messages in the range; the PR or plan task this belongs to (its acceptance criteria, if it's a bosun task); CLAUDE.md conventions; which checks the project has.
+Commit messages in the range; the PR or plan task this belongs to (its acceptance criteria, if it's a bosun task); the OpenSpec change it implements, if any (a bosun board with `meta.openspec_change`, or files under `openspec/changes/` in the diff); CLAUDE.md conventions; which checks the project has.
 
 ## 3. Choose lenses and split the work
 
 Unless `--lenses` is given:
 - always `correctness`;
+- `spec` when the work implements an OpenSpec change: give the reviewer the change's requirement blocks (`openspec/changes/<id>/specs/`) and ask it to check every scenario against the code and tests;
 - `tests` when code changed;
 - `security` when the diff touches auth, sessions, crypto, input parsing, queries, file or network I/O, deserialization, permissions, secrets or config, dependencies, CI or infrastructure;
 - `design` for new modules, public APIs, or more than about 300 changed lines;

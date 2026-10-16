@@ -9,6 +9,8 @@ disable-model-invocation: true
 
 Arguments: $ARGUMENTS
 
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+
 ## 1. Preconditions
 
 - You're on a branch other than the base branch, and the working tree is clean. If it isn't clean, offer `/bosun:commit` and stop.
