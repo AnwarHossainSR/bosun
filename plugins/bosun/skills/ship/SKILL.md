@@ -29,7 +29,7 @@ Skip with `--no-review`, or when `.bosun/reviews/` already has a review of this 
 ## 4. Write the PR
 
 - **Title**: the repository's convention (for example Conventional Commits), at most 72 characters.
-- **Body**: if the repository has a PR template (`.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, `docs/pull_request_template.md`, or `PULL_REQUEST_TEMPLATE.md`), keep its headings and fill them from the actual changes. Otherwise use: Summary, Changes, How to test, Risks and rollout, Linked issues. Draw on the commits, the bosun plan's SUMMARY.md if there is one, and the gate results.
+- **Body**: if the repository has a PR template (`.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, `docs/pull_request_template.md`, or `PULL_REQUEST_TEMPLATE.md`), keep its headings and fill them from the actual changes. Otherwise use: Summary, Changes, How to test, Risks and rollout, Linked issues. Draw on the commits, the bosun plan's SUMMARY.md if there is one, and the gate results. If the plan was made from a GitHub issue (`meta.issue` on the board), link it: `Closes #<n>` when the build delivered everything the issue asks for, otherwise `Refs #<n>`; tell the user which one you used, since `Closes` closes the issue when the PR merges.
 - Don't invent issue numbers, test results, screenshots or metrics. Report only checks you actually ran.
 - Write the body to a temp file.
 

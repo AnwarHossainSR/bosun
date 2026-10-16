@@ -55,7 +55,14 @@ claude plugin marketplace add AnwarHossainSR/bosun
 claude plugin install bosun@bosun-marketplace
 ```
 
-**C. Try it for one session without installing:**
+**C. For one project, shared with your team.** Run inside the project:
+```bash
+claude plugin marketplace add AnwarHossainSR/bosun --scope project
+claude plugin install bosun@bosun-marketplace --scope project
+```
+This writes `extraKnownMarketplaces` and `enabledPlugins` to the project's `.claude/settings.json`; commit that file so teammates get the same setup. To follow a specific branch or tag, add it after `#`, for example `AnwarHossainSR/bosun#main`.
+
+**D. Try it for one session without installing:**
 ```bash
 claude --plugin-dir /path/to/bosun/plugins/bosun
 ```
@@ -70,6 +77,7 @@ Check it loaded: `claude plugin details bosun` should list Skills (12), Agents (
 (start a new session if setup changed worktree.baseRef)
 /bosun:plan a team task tracker with workspaces, kanban board and email notifications
                                   writes openspec/changes/<id>/ + the task board; you review and approve
+                                  (or plan from an issue: /bosun:plan #123, or the issue URL)
 /bosun:build                      runs the approved plan with parallel agents
 /bosun:status --audit             any time, from the same session
 /bosun:review                     final multi-lens review
@@ -90,7 +98,7 @@ Or hand anything to the manager and let it route:
 | Command | What it does |
 |---|---|
 | `/bosun:manager <goal>` | Triage any goal: picks plan/build, investigate, review, audit, an ad-hoc crew, or a single agent for small changes. |
-| `/bosun:plan <idea>` | Clarifying questions, parallel scouts, the architect writes an OpenSpec change (proposal, specs with scenarios, design, tasks.md) and the task board, validation, architecture and security critique, your approval. `--classic` writes `PLAN.md` instead; naming an existing change only adds the board. |
+| `/bosun:plan <idea>` | Clarifying questions, parallel scouts, the architect writes an OpenSpec change (proposal, specs with scenarios, design, tasks.md) and the task board, validation, architecture and security critique, your approval. `--classic` writes `PLAN.md` instead; naming an existing change only adds the board; `#123` or an issue URL plans from a GitHub issue and links it in the proposal and the PR. |
 | `/bosun:build [plan]` | Executes a board: rolling pool of N agents in worktrees, review, spec and security gates, merge, tasks.md ticks, checks, monitor, resume (`--resume`), `--parallel`, `--review task\|batch\|final`, `--dry-run`. |
 | `/bosun:archive [id]` | Checks every task is done and the change validates, runs `openspec archive`, re-validates the main specs, commits after you confirm. Only runs when you type it. |
 | `/bosun:status [--audit]` | Dashboard: progress, in flight, blocked, next, recent agent activity; `--audit` adds the monitor agent's health check. |
