@@ -11,7 +11,7 @@ Arguments: $ARGUMENTS
 
 TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"`. Run every `openspec` command with `OPENSPEC_TELEMETRY=0` set, from the repository root.
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): terse fragments for your own prose; exact commands, paths and errors; full sentences for warnings and questions; never drop a fact. Commit messages stay normal prose.
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): terse fragments for your own prose; exact commands, paths and errors; keep logic words (because, so, but, not); full sentences for warnings, questions and requests to confirm; never drop a fact. Commit messages stay normal prose.
 
 ## 1. Resolve the change
 

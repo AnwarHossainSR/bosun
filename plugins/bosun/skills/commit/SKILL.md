@@ -8,7 +8,7 @@ argument-hint: "[hint about the change] [--yes] [--amend]"
 
 Arguments: $ARGUMENTS
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, may); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 ## 1. Inspect
 
@@ -35,7 +35,7 @@ Never print a secret's value; give the file and line.
 
 - Subject: imperative mood, at most 72 characters (aim for 50), no trailing period, type and scope per the convention, describing the change from the reader's point of view.
 - Body, when the change isn't trivial, wrapped at 72 columns: what changed and why (not how), notable trade-offs, migration notes.
-- Footers: `BREAKING CHANGE: ...` when it applies; issue references only when you actually know them (branch name, the user, the plan). Never invent issue numbers. Add any trailers the project or the user requires.
+- Footers: `BREAKING CHANGE: ...` when it applies; issue references only when you actually know them (branch name, the user, the plan's `meta.issue`). Never invent issue numbers. Add any trailers the project or the user requires.
 
 ## 6. Confirm and commit
 

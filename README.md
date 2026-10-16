@@ -55,7 +55,21 @@ claude plugin marketplace add AnwarHossainSR/bosun
 claude plugin install bosun@bosun-marketplace
 ```
 
-**C. Try it for one session without installing:**
+**C. For one project, shared with your team.** Run inside the project:
+```bash
+claude plugin marketplace add AnwarHossainSR/bosun --scope project
+claude plugin install bosun@bosun-marketplace --scope project
+```
+This writes `extraKnownMarketplaces` and `enabledPlugins` to the project's `.claude/settings.json`; commit that file. Teammates get bosun after they accept the folder's trust prompt: the marketplace lists the plugin by a relative path, and the [Claude Code plugin docs](https://code.claude.com/docs/en/plugins/install.md) say such a plugin loads from the marketplace copy without a separate install. I haven't tried that with a second account. To follow a specific branch or tag, add it after `#`, for example `AnwarHossainSR/bosun#main`.
+
+**D. Claude Code on the web (cloud sessions).** Cloud sessions don't load plugins installed on your own machine or turned on in the repository's `.claude/settings.json` (documented in the same docs). Install bosun inside the cloud container instead, by adding these lines to the environment's setup script (the environment menu in the session's title bar, then Edit, then Setup script), which runs when each new session starts:
+```bash
+claude plugin marketplace add AnwarHossainSR/bosun
+claude plugin install bosun@bosun-marketplace
+```
+Both commands are safe to repeat: a second run reports "already installed" and exits 0. I haven't tested them through a setup script; in a cloud session, installing bosun this way inside the container did make its skills and agents available.
+
+**E. Try it for one session without installing:**
 ```bash
 claude --plugin-dir /path/to/bosun/plugins/bosun
 ```
@@ -70,6 +84,7 @@ Check it loaded: `claude plugin details bosun` should list Skills (12), Agents (
 (start a new session if setup changed worktree.baseRef)
 /bosun:plan a team task tracker with workspaces, kanban board and email notifications
                                   writes openspec/changes/<id>/ + the task board; you review and approve
+                                  (or plan from an issue: /bosun:plan #123, or the issue URL)
 /bosun:build                      runs the approved plan with parallel agents
 /bosun:status --audit             any time, from the same session
 /bosun:review                     final multi-lens review
@@ -90,7 +105,7 @@ Or hand anything to the manager and let it route:
 | Command | What it does |
 |---|---|
 | `/bosun:manager <goal>` | Triage any goal: picks plan/build, investigate, review, audit, an ad-hoc crew, or a single agent for small changes. |
-| `/bosun:plan <idea>` | Clarifying questions, parallel scouts, the architect writes an OpenSpec change (proposal, specs with scenarios, design, tasks.md) and the task board, validation, architecture and security critique, your approval. `--classic` writes `PLAN.md` instead; naming an existing change only adds the board. |
+| `/bosun:plan <idea>` | Clarifying questions, parallel scouts, the architect writes an OpenSpec change (proposal, specs with scenarios, design, tasks.md) and the task board, validation, architecture and security critique, your approval. `--classic` writes `PLAN.md` instead; naming an existing change only adds the board; `#123` or an issue URL plans from a GitHub issue and links it in the proposal and the PR. |
 | `/bosun:build [plan]` | Executes a board: rolling pool of N agents in worktrees, review, spec and security gates, merge, tasks.md ticks, checks, monitor, resume (`--resume`), `--parallel`, `--review task\|batch\|final`, `--dry-run`. |
 | `/bosun:archive [id]` | Checks every task is done and the change validates, runs `openspec archive`, re-validates the main specs, commits after you confirm. Only runs when you type it. |
 | `/bosun:status [--audit]` | Dashboard: progress, in flight, blocked, next, recent agent activity; `--audit` adds the monitor agent's health check. |
@@ -205,7 +220,17 @@ Agent reports flow into the manager's context, and the manager's updates flow to
 | `caveman-ultra` | telegraphic; common abbreviations |
 | `normal` | unchanged |
 
-`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text costs about 130 tokens per agent start. I haven't measured the savings: they depend on how much prose a task produces, and the style only shortens prose, not code, diffs, tool output or the structured result blocks. It works independently of any caveman-style skill you may use in your own sessions.
+`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text adds roughly 150-200 tokens per agent start (estimated from its length).
+
+How much it saves, measured on a small sample: agents wrote four typical bosun messages (an implementer result, review findings, an investigation report, a progress update) in normal prose; other agents rewrote each one at every level with these rules, and separate agents checked each rewrite for lost facts.
+
+| `output_style` | Fewer words in the prose | Fewer words in the whole message (with the result block) |
+|---|---|---|
+| `caveman-lite` | about 11% | about 8% |
+| `caveman` | about 25% | about 20% |
+| `caveman-ultra` | about 27% | about 21% |
+
+No real facts were lost; the checkers flagged only minor wording losses, such as a dropped count that the listed ids still show. Treat the numbers as rough: four messages, one rewrite each, and words are only a proxy for tokens. They also cover only what agents write. Most tokens in agent work are usually input (instructions, files, tool output), which this style doesn't change, so the saving on a whole session is much smaller. It works independently of any caveman-style skill you may use in your own sessions.
 
 ## Safety model
 
@@ -276,7 +301,7 @@ Verified while building this:
 - the git commands the build skill prescribes were run in a scratch repository (worktrees, `--no-ff` merges, `--no-commit` merge plus tasks.md tick in one commit, merge revert unticking it, aborting a squash merge, path-limited commits for shared mode, cleanup after squash);
 - with OpenSpec 1.14.2: the example change passes `openspec validate --strict`; an archive round trip (all tasks ticked, `openspec archive`, `openspec validate --specs --strict`) works; and `spec-check` was compared with `openspec validate` and `openspec archive` on deliberately broken changes.
 
-**Not verified: a full live multi-agent build**, and how many tokens the terse output style saves. A build runs real Claude sessions on your account, so I didn't start one. Try it first on a small throwaway repository. LLM agents follow instructions imperfectly; the gates and the verifier reduce mistakes but don't remove them. Review the merged result before you ship.
+**Not verified: a full live multi-agent build**, and the terse style's savings on real builds (only the small sample above was measured). A build runs real Claude sessions on your account, so I didn't start one. Try it first on a small throwaway repository. LLM agents follow instructions imperfectly; the gates and the verifier reduce mistakes but don't remove them. Review the merged result before you ship.
 
 Known limitations:
 - Worktree mode needs `worktree.baseRef: "head"`. Each worktree installs its own dependencies, which is slow for large JS projects.

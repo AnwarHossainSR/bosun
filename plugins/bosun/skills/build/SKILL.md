@@ -10,7 +10,7 @@ Arguments: $ARGUMENTS
 
 TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (use `python` if `python3` is missing). The board (tasks.json) is the source of truth, and **you are its only writer**: subagents never edit it. Prefer one TB call with several ids over several parallel TB calls. Edge cases (shared mode, merge conflicts, resume, review policies) are covered in [reference/execution.md](reference/execution.md); read it when you hit one.
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, may); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 **OpenSpec plans** are boards with `meta.openspec_change`. The change in `openspec/changes/<id>/` is the contract: each brief quotes the requirements its task implements, `TB set --status done` ticks the task in tasks.md, and only the architect edits the change.
 
@@ -24,8 +24,12 @@ TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (use `python` if
    - OpenSpec plan with uncommitted plan files: commit them on the work branch now (`git add -- <those paths>`, then `git commit -m "docs(spec): propose <id>"` in the repository's commit style). Worktrees contain only committed files, and implementers read the specs there.
    - Worktree base: subagent worktrees must branch from the current HEAD, not the default branch, or tasks won't see the dependencies merged before them. Check `worktree.baseRef` in `.claude/settings.local.json`, `.claude/settings.json` and `~/.claude/settings.json`. If it isn't `"head"`: explain, and offer either to add it to `.claude/settings.local.json` and restart the session, or to continue in shared mode.
    - Not a git repository: shared mode.
-4. **Resume** (`--resume`, or tasks already `in_progress`/`review`): agents from an earlier session are gone. For each such task, look for its branch or worktree (board fields `branch` and `worktree`, `git worktree list`). Commits present: set it to `review` and run the gate (section 2, step 3). Otherwise: `TB set <board> <ids> --status pending --note "reset on resume"`. OpenSpec plan: if `TB status` reports tasks.md out of sync, run `TB sync <board>` and commit tasks.md.
-5. **Confirm.** Show tasks remaining, the `TB waves <board> --parallel <N>` summary, parallelism, isolation, review policy and work branch. Ask for a go-ahead unless the user already approved this build. With `--dry-run`, also print the prompt for the first wave, then stop.
+4. **Resume** (`--resume`, or tasks already `in_progress`/`review`): agents from an earlier session are gone. For each such task, look for its branch or worktree (board fields `branch` and `worktree`, `git worktree list`) and decide now; act after the go-ahead in step 5:
+   - `review` with commits: run its gate (section 2, step 3) before dispatching new work;
+   - `in_progress` with commits: the work may be unfinished, so retry it with an implementer whose prompt starts with "First run `git merge <task_branch>`" (reference, "Resume details");
+   - no commits: `TB set <board> <ids> --status pending --note "reset on resume"`.
+   Also check for a merge left in progress (reference, "Resume details"). OpenSpec plan: if `TB status` reports tasks.md out of sync, run `TB sync <board>` and commit tasks.md.
+5. **Confirm.** Show tasks remaining, the resume decisions from step 4, the `TB waves <board> --parallel <N>` summary, parallelism, isolation, review policy and work branch. Ask for a go-ahead before starting any agent, unless the user already approved this build. With `--dry-run`, also print the prompt for the first wave, then stop.
 
 ## 1. Scheduling loop (rolling pool)
 
