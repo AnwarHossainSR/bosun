@@ -215,7 +215,11 @@ class EventTests(unittest.TestCase):
         def context(env=None):
             proc = self.run_hook(self.base("SubagentStart"), env)
             return json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"] if proc.stdout else ""
-        self.assertIn("telegraphic", context({"BOSUN_OUTPUT_STYLE": "caveman-ultra"}))
+        ultra = context({"BOSUN_OUTPUT_STYLE": "caveman-ultra"})
+        self.assertIn("telegraphic", ultra)
+        self.assertIn("never for cause", ultra)
+        self.assertIn("statements of uncertainty", ultra)
+        self.assertIn("because, so, but, not", ultra)
         self.assertIn("Output style: caveman (", context({"BOSUN_OUTPUT_STYLE": "shouting"}))
         cfg = json.loads((self.root / ".bosun" / "config.json").read_text())
         (self.root / ".bosun" / "config.json").write_text(json.dumps(dict(cfg, output_style="normal")))

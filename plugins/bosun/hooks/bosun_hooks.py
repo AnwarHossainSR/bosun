@@ -98,14 +98,16 @@ STYLE_LEVELS = {
     "caveman-lite": "Prose: no filler, pleasantries or hedging words. Short, complete sentences.",
     "caveman": "Prose: terse fragments. Drop articles, filler, pleasantries and hedging words. "
                "Short words. One point per line.",
-    "caveman-ultra": "Prose: telegraphic fragments only. Abbreviate common words (cfg, fn, impl, deps, req, err). "
-                     "Use -> for cause and next step.",
+    "caveman-ultra": "Prose: telegraphic fragments. Abbreviate common words (cfg, fn, impl, deps, req, err). "
+                     "Use -> for sequence and next step, never for cause.",
 }
 STYLE_RULES = (
-    "Keep exact: code, commands, paths, identifiers, error text, numbers, versions.",
+    "Keep exact: code, commands, paths, identifiers, error text, numbers, versions, and text quoted from specs, "
+    "tests or hypotheses.",
+    "Keep the words that carry logic: because, so, but, not, only, can, may, must.",
     "Write normally: code comments, commit messages, PR text, docs, OpenSpec files, user-facing strings.",
-    "Use plain full sentences for security warnings, destructive or irreversible steps, ordered instructions "
-    "and questions.",
+    "Use plain full sentences for security warnings, destructive or irreversible steps, ordered instructions, "
+    "questions, requests to confirm or decide, and statements of uncertainty.",
     "Never drop a fact to save words: keep every failure and every uncertainty label "
     "(unverified, not run, assumption).",
 )

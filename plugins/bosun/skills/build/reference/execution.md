@@ -40,7 +40,7 @@ Never resolve a conflict by throwing away one side wholesale without understandi
 
 ## Resume details
 
-- `TB status <board>` and `git worktree list` show what survived the interruption. A task in `review` with a branch gets gated again. An `in_progress` task with commits on its branch is a partial result: spawn an implementer to finish it, starting with `git merge <task_branch>`.
+- `TB status <board>` and `git worktree list` show what survived the interruption. A task in `review` with a branch gets gated again. An `in_progress` task with commits on its branch is a partial result: spawn an implementer to finish it, starting with `git merge <task_branch>`. Both happen after the go-ahead (skill, preflight step 5).
 - If the work branch contains a merge for a task the board doesn't mark done (the session stopped between committing and `TB set --commit`), mark it done with that merge's sha.
 - A merge still in progress (`git rev-parse -q --verify MERGE_HEAD` succeeds, or `git status` shows staged squash changes) means the session stopped between `git merge --no-commit` and `git commit`. Run the integration check again, then either commit it (after `TB set <board> <ID> --status done`) or undo it with `git merge --abort` (`git reset --merge` after a squash) and set the task back to `review`.
 - OpenSpec plans: `TB status <board>` reports tasks.md drift; `TB sync <board>` repairs it, then commit tasks.md.

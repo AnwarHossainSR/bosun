@@ -10,7 +10,7 @@ Request: $ARGUMENTS
 
 TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"`. Read `.bosun/config.json` if it exists. If it doesn't, mention `/bosun:setup` once and continue with the defaults: `max_parallel` 4, `planning.format` openspec, `planning.openspec_dir` `openspec`.
 
-**Style:** follow `output_style` in the config (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors and numbers stay exact; warnings, destructive steps, ordered steps and questions get full sentences; never drop a fact or an uncertainty label. Specs, commits, PR text and docs stay normal prose. `normal` turns this off.
+**Style:** follow `output_style` in the config (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, may); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Specs, commits, PR text and docs stay normal prose. `normal` turns this off.
 
 ## 0. Format
 
