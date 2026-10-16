@@ -104,7 +104,7 @@ STYLE_LEVELS = {
 STYLE_RULES = (
     "Keep exact: code, commands, paths, identifiers, error text, numbers, versions, and text quoted from specs, "
     "tests or hypotheses.",
-    "Keep the words that carry logic: because, so, but, not, only, can, may, must.",
+    "Keep the words that carry logic, even when dropping hedges: because, so, but, not, only, can, may, must.",
     "Write normally: code comments, commit messages, PR text, docs, OpenSpec files, user-facing strings.",
     "Use plain full sentences for security warnings, destructive or irreversible steps, ordered instructions, "
     "questions, requests to confirm or decide, and statements of uncertainty.",
@@ -721,28 +721,38 @@ def build_context(data):
     root = project_dir(data)
     cfg = load_config(root)
     style = style_context(output_style(cfg))
-    profile = project_profile(root, cfg) if root else None
+    room = MAX_CONTEXT_CHARS - len(style) - 2 if style else MAX_CONTEXT_CHARS
+    profile = project_profile(root, cfg, room) if root else None
     if profile and style:
-        return profile[:MAX_CONTEXT_CHARS - len(style) - 2] + "\n\n" + style
+        return profile + "\n\n" + style
     return profile or style
 
 
-def project_profile(root, cfg):
-    lines = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
+def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
+    head = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
     commands = cfg.get("commands") or {}
-    shown = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
-    lines += shown or ["- no commands configured: find them in package scripts, Makefile, or CI config"]
+    body = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
+    body = body or ["- no commands configured: find them in package scripts, Makefile, or CI config"]
     conventions = cfg.get("conventions") or {}
     if conventions.get("commit_style"):
-        lines.append(f"- commit style: {conventions['commit_style']}")
+        body.append(f"- commit style: {conventions['commit_style']}")
     for note in (conventions.get("notes") or [])[:10]:
-        lines.append(f"- convention: {note}")
+        body.append(f"- convention: {note}")
+    tail = []
     protected = [p for p in cfg.get("protected_paths") or [] if isinstance(p, str)]
     if protected:
-        lines.append("- protected paths (never edit): " + ", ".join(protected))
-    lines.append(f"- main checkout: {root}")
-    lines.append(f"Finish with the {RESULT_MARKER} block from your instructions.")
-    return "\n".join(lines)[:MAX_CONTEXT_CHARS]
+        tail.append("- protected paths (never edit): " + ", ".join(protected))
+    tail.append(f"- main checkout: {root}")
+    tail.append(f"Finish with the {RESULT_MARKER} block from your instructions.")
+    lines = head + body + tail
+    if len("\n".join(lines)) > limit:
+        # Too long: drop the last free-form lines (convention notes first), never the protected paths,
+        # the main checkout or the result reminder, and say that something was left out.
+        cut = "- (profile cut to fit; the rest is in .bosun/config.json)"
+        while body and len("\n".join(head + body + [cut] + tail)) > limit:
+            body.pop()
+        lines = head + body + [cut] + tail
+    return "\n".join(lines)[:limit]
 
 
 def handle(data):

@@ -10,7 +10,7 @@ Arguments: $ARGUMENTS
 
 TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (use `python` if `python3` is missing). The board (tasks.json) is the source of truth, and **you are its only writer**: subagents never edit it. Prefer one TB call with several ids over several parallel TB calls. Edge cases (shared mode, merge conflicts, resume, review policies) are covered in [reference/execution.md](reference/execution.md); read it when you hit one.
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, may); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, can, may, must); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 **OpenSpec plans** are boards with `meta.openspec_change`. The change in `openspec/changes/<id>/` is the contract: each brief quotes the requirements its task implements, `TB set --status done` ticks the task in tasks.md, and only the architect edits the change.
 
@@ -19,17 +19,19 @@ TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (use `python` if
 1. **Board.** Resolve the argument (change id, slug, directory or path), else `TB latest`. Run `TB validate <board>`; errors mean stop. OpenSpec plan: also `TB spec-check <board>`, and with the CLI `OPENSPEC_TELEMETRY=0 openspec validate <id> --strict --no-interactive`; errors mean stop.
 2. **Settings.** Read `.bosun/config.json`. Defaults when absent: `build.max_parallel` 4, `isolation` worktree, `review` task, `security_review` sensitive, `max_attempts` 2, `merge` merge. Flags override. Note `commands` (install, test, lint, typecheck, build).
 3. **Git** (worktree mode):
-   - The working tree must be clean apart from ignored files, `.bosun/`, and (OpenSpec plan) the uncommitted plan files: the change directory, plus `openspec/config.yaml` if the plan created it. Otherwise ask the user to commit or stash first. Never stash for them.
+   - The working tree must be clean apart from ignored files, `.bosun/`, and (OpenSpec plan) the uncommitted plan files: the change directory, plus `openspec/config.yaml` if the plan created it. Otherwise ask the user to commit or stash first. Never stash for them. Exception: a merge that an interrupted build left in progress (`git rev-parse -q --verify MERGE_HEAD` succeeds, or after a squash the file at `git rev-parse --git-path SQUASH_MSG` exists). It isn't the user's work, and committing it skips the integration check while stashing it drops the merge, so don't ask about it: step 4 handles it.
    - Work branch: if `meta.work_branch` exists, switch to it. Otherwise, on the default branch create `bosun/<plan-name>`; on another branch, use that branch. Record it: `TB meta <board> --set work_branch=<b> --set base_branch=<default> --set base_commit=<sha> --set isolation=<mode> --set max_parallel=<N>`.
    - OpenSpec plan with uncommitted plan files: commit them on the work branch now (`git add -- <those paths>`, then `git commit -m "docs(spec): propose <id>"` in the repository's commit style). Worktrees contain only committed files, and implementers read the specs there.
    - Worktree base: subagent worktrees must branch from the current HEAD, not the default branch, or tasks won't see the dependencies merged before them. Check `worktree.baseRef` in `.claude/settings.local.json`, `.claude/settings.json` and `~/.claude/settings.json`. If it isn't `"head"`: explain, and offer either to add it to `.claude/settings.local.json` and restart the session, or to continue in shared mode.
    - Not a git repository: shared mode.
-4. **Resume** (`--resume`, or tasks already `in_progress`/`review`): agents from an earlier session are gone. For each such task, look for its branch or worktree (board fields `branch` and `worktree`, `git worktree list`) and decide now; act after the go-ahead in step 5:
-   - `review` with commits: run its gate (section 2, step 3) before dispatching new work;
-   - `in_progress` with commits: the work may be unfinished, so retry it with an implementer whose prompt starts with "First run `git merge <task_branch>`" (reference, "Resume details");
-   - no commits: `TB set <board> <ids> --status pending --note "reset on resume"`.
-   Also check for a merge left in progress (reference, "Resume details"). OpenSpec plan: if `TB status` reports tasks.md out of sync, run `TB sync <board>` and commit tasks.md.
-5. **Confirm.** Show tasks remaining, the resume decisions from step 4, the `TB waves <board> --parallel <N>` summary, parallelism, isolation, review policy and work branch. Ask for a go-ahead before starting any agent, unless the user already approved this build. With `--dry-run`, also print the prompt for the first wave, then stop.
+4. **Resume** (`--resume`, or tasks already `in_progress`/`review`): agents from an earlier session are gone. Decide now; act after the go-ahead in step 5:
+   - A merge left in progress (step 3): settle it first (reference, "Resume details").
+   - Find each task's work. A `review` task: the board fields `branch` and `worktree`. An `in_progress` task: those fields are written only at review, so they're missing or left over from an earlier attempt; look in `git worktree list` for the worktree with commits named `<type>(<ID>): ...` or uncommitted changes in the task's files. If you can't tell which worktree is the task's, don't guess: treat the task as having no work.
+   - `review` with commits: run its gate (section 2, step 3) before dispatching new work.
+   - `in_progress` with commits or uncommitted changes: the work may be unfinished. Commit the changes in its worktree (as in section 2, step 2), then retry it with an implementer whose prompt starts with "First run `git merge <task_branch>`" (reference, "Resume details").
+   - No work: `TB set <board> <ids> --status pending --note "reset on resume"`.
+   OpenSpec plan: if `TB status` reports tasks.md out of sync, run `TB sync <board>` and commit tasks.md.
+5. **Confirm.** Show tasks remaining, the resume decisions from step 4 (including worktrees no task claimed), the `TB waves <board> --parallel <N>` summary, parallelism, isolation, review policy and work branch. Ask for a go-ahead before starting any agent, unless the user already approved this build. With `--dry-run`, also print the prompt for the first wave, then stop.
 
 ## 1. Scheduling loop (rolling pool)
 

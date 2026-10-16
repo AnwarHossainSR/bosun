@@ -8,7 +8,7 @@ argument-hint: "[staged | working | <base>...<head> | <commit>] [--lenses correc
 
 Target: $ARGUMENTS
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, may); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, can, may, must); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 ## 1. Resolve the target
 
@@ -53,5 +53,7 @@ Write `.bosun/reviews/<YYYY-MM-DD>-<slug>.md`, including the reviewed range and 
 Be specific and calm. No padding, no filler praise.
 
 ## 7. --fix
+
+Fixes land in the working tree, so `--fix` needs the reviewed code checked out: the default target, `staged`, `working`, or a range or commit whose head is `HEAD` (`git rev-parse <head>` equals `git rev-parse HEAD`). Otherwise don't change anything: say why, and let the user check out the head first.
 
 Apply fixes for confirmed critical, high and medium findings: trivial ones yourself, larger ones through `bosun:implementer` in shared mode (no `isolation`, with the files it owns), so the fixes land uncommitted in the working tree. Re-run the checks, then re-review only the changed areas with a `bosun:code-reviewer` (or `bosun:security-reviewer`) using the lens that raised each finding. Don't commit unless the user asks (`/bosun:commit`).
