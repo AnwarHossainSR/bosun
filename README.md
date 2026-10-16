@@ -60,9 +60,16 @@ claude plugin install bosun@bosun-marketplace
 claude plugin marketplace add AnwarHossainSR/bosun --scope project
 claude plugin install bosun@bosun-marketplace --scope project
 ```
-This writes `extraKnownMarketplaces` and `enabledPlugins` to the project's `.claude/settings.json`; commit that file so teammates get the same setup. To follow a specific branch or tag, add it after `#`, for example `AnwarHossainSR/bosun#main`.
+This writes `extraKnownMarketplaces` and `enabledPlugins` to the project's `.claude/settings.json`; commit that file. Teammates get bosun after they accept the folder's trust prompt: the marketplace lists the plugin by a relative path, and the [Claude Code plugin docs](https://code.claude.com/docs/en/plugins/install.md) say such a plugin loads from the marketplace copy without a separate install. I haven't tried that with a second account. To follow a specific branch or tag, add it after `#`, for example `AnwarHossainSR/bosun#main`.
 
-**D. Try it for one session without installing:**
+**D. Claude Code on the web (cloud sessions).** Cloud sessions don't load plugins installed on your own machine or turned on in the repository's `.claude/settings.json` (documented in the same docs). Install bosun inside the cloud container instead, by adding these lines to the environment's setup script (the environment menu in the session's title bar, then Edit, then Setup script), which runs when each new session starts:
+```bash
+claude plugin marketplace add AnwarHossainSR/bosun
+claude plugin install bosun@bosun-marketplace
+```
+Both commands are safe to repeat: a second run reports "already installed" and exits 0. I haven't tested them through a setup script; in a cloud session, installing bosun this way inside the container did make its skills and agents available.
+
+**E. Try it for one session without installing:**
 ```bash
 claude --plugin-dir /path/to/bosun/plugins/bosun
 ```
