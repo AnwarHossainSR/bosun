@@ -1,0 +1,806 @@
+{
+  "name": "taskflow",
+  "title": "TaskFlow: team task tracker (example plan)",
+  "version": 1,
+  "meta": {
+    "max_parallel": 5,
+    "isolation": "worktree"
+  },
+  "tasks": [
+    {
+      "id": "T01",
+      "title": "Scaffold monorepo, tooling, CI and install all workspace dependencies",
+      "description": "Contract-first: create every workspace manifest and install the dependencies listed in PLAN.md section 'Tech stack' now, so later tasks don't fight over package manifests and the lockfile.",
+      "deps": [],
+      "files": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "pnpm-lock.yaml",
+        "tsconfig.base.json",
+        "eslint.config.js",
+        ".prettierrc",
+        ".github/workflows/",
+        "apps/api/package.json",
+        "apps/web/package.json",
+        "packages/shared/package.json"
+      ],
+      "acceptance": [
+        "`pnpm install` succeeds from a clean clone",
+        "`pnpm lint` and `pnpm typecheck` pass on the empty workspaces",
+        "CI workflow runs lint, typecheck and test on pull requests"
+      ],
+      "size": "M",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T02",
+      "title": "Spike: choose the session strategy (server sessions vs tokens)",
+      "agent": "scout",
+      "kind": "report",
+      "description": "Research spike that T09 depends on. Read PLAN.md 'Security'; check the libraries already chosen in T01. Output a short decision record.",
+      "deps": [],
+      "files": [],
+      "acceptance": [
+        "Report compares at least 2 options on security, revocation, CSRF exposure and complexity",
+        "Report ends with one recommendation and the reasons"
+      ],
+      "size": "S",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T03",
+      "title": "Shared domain schemas and types",
+      "description": "These schemas are the contract both apps build against; keep them stable once merged. Include the role enum and the task status workflow.",
+      "deps": [
+        "T01"
+      ],
+      "files": [
+        "packages/shared/src/",
+        "packages/shared/tsconfig.json"
+      ],
+      "acceptance": [
+        "Schemas for User, Workspace, Membership, Project, Task, Comment, Label exported from packages/shared",
+        "Unit tests cover valid and invalid payloads for each schema",
+        "`pnpm --filter shared test` passes"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T04",
+      "title": "API skeleton: config, error handling, health check, module auto-loading",
+      "description": "Auto-loading modules removes a classic merge hotspot: feature tasks add a module directory and never touch a shared registry. New dependencies after T01: add them to this workspace's package.json, run the install, and report it under out_of_scope_changes (the manager re-runs the install on lockfile conflicts).",
+      "deps": [
+        "T01"
+      ],
+      "files": [
+        "apps/api/tsconfig.json",
+        "apps/api/src/server.ts",
+        "apps/api/src/app.ts",
+        "apps/api/src/config/",
+        "apps/api/src/lib/errors.ts",
+        "apps/api/src/modules/health/"
+      ],
+      "acceptance": [
+        "GET /health returns 200 with a JSON body",
+        "Unknown routes return a JSON 404 in the shared error format",
+        "Modules under src/modules/*/ are registered automatically, with no central route file to edit"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T05",
+      "title": "Web skeleton: build setup, app shell, feature route discovery",
+      "description": "Feature tasks must not edit a central router. verify: the bundler's glob-import feature for route discovery. New dependencies after T01: add them to this workspace's package.json, run the install, and report it under out_of_scope_changes (the manager re-runs the install on lockfile conflicts).",
+      "deps": [
+        "T01"
+      ],
+      "files": [
+        "apps/web/tsconfig.json",
+        "apps/web/index.html",
+        "apps/web/vite.config.ts",
+        "apps/web/src/main.tsx",
+        "apps/web/src/app/"
+      ],
+      "acceptance": [
+        "`pnpm --filter web dev` serves the app shell",
+        "Routes declared in src/features/*/routes.tsx are discovered automatically",
+        "A smoke test renders the shell"
+      ],
+      "size": "M",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T06",
+      "title": "API integration test harness with an ephemeral database",
+      "description": "Every API task after this writes integration tests with this harness.",
+      "deps": [
+        "T04"
+      ],
+      "files": [
+        "apps/api/test/",
+        "apps/api/vitest.config.ts"
+      ],
+      "acceptance": [
+        "`pnpm --filter api test` starts an isolated database per run and tears it down",
+        "Example integration test against /health passes"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T07",
+      "title": "Database access, migration runner and core schema (users, workspaces, memberships)",
+      "description": "",
+      "deps": [
+        "T03",
+        "T04"
+      ],
+      "files": [
+        "apps/api/src/db/",
+        "apps/api/migrations/"
+      ],
+      "acceptance": [
+        "Migrations apply cleanly to an empty database and are re-runnable",
+        "Unique constraint on user email",
+        "Membership has a role column using the shared role enum"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T08",
+      "title": "User repository and password hashing",
+      "description": "",
+      "deps": [
+        "T06",
+        "T07"
+      ],
+      "files": [
+        "apps/api/src/modules/users/"
+      ],
+      "acceptance": [
+        "Passwords are hashed with a memory-hard algorithm (argon2id preferred, bcrypt acceptable); plaintext is never stored or logged",
+        "Integration tests cover create, find-by-email, and duplicate email"
+      ],
+      "size": "M",
+      "risk": "high",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T09",
+      "title": "Auth endpoints: signup, login, logout",
+      "description": "",
+      "deps": [
+        "T02",
+        "T08"
+      ],
+      "files": [
+        "apps/api/src/modules/auth/"
+      ],
+      "acceptance": [
+        "Signup, login and logout work end to end in integration tests",
+        "Login failures return the same error for unknown email and wrong password",
+        "Session or token handling follows the T02 decision"
+      ],
+      "size": "L",
+      "risk": "high",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T10",
+      "title": "Auth guard and request context",
+      "description": "",
+      "deps": [
+        "T09"
+      ],
+      "files": [
+        "apps/api/src/lib/auth-guard.ts",
+        "apps/api/src/lib/request-context.ts"
+      ],
+      "acceptance": [
+        "Protected routes return 401 without a valid session",
+        "Handlers can read the current user from the request context"
+      ],
+      "size": "S",
+      "risk": "high",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T11",
+      "title": "Authorization policies for workspace roles",
+      "description": "Central place for permission checks; resource modules call it instead of re-implementing role logic.",
+      "deps": [
+        "T10"
+      ],
+      "files": [
+        "apps/api/src/lib/policy.ts"
+      ],
+      "acceptance": [
+        "Policy functions decide owner, admin, member and viewer permissions for every resource type",
+        "Table-driven tests cover each role and action, including denial cases"
+      ],
+      "size": "M",
+      "risk": "high",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T12",
+      "title": "Security hardening: rate limits, security headers, CSRF and CORS",
+      "description": "",
+      "deps": [
+        "T10"
+      ],
+      "files": [
+        "apps/api/src/lib/security.ts"
+      ],
+      "acceptance": [
+        "Login and signup are rate limited per IP and per account",
+        "Security headers present on every response",
+        "CSRF protection on state-changing routes if cookie sessions are used",
+        "CORS allows only configured origins"
+      ],
+      "size": "M",
+      "risk": "high",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T13",
+      "title": "Schema and migrations: projects, tasks, comments, labels",
+      "description": "",
+      "deps": [
+        "T07"
+      ],
+      "files": [
+        "apps/api/src/db/schema/work.ts",
+        "apps/api/migrations/"
+      ],
+      "acceptance": [
+        "Migrations apply on top of T07's",
+        "Foreign keys and indexes for workspace_id, project_id and assignee_id"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T14",
+      "title": "Workspaces API: CRUD, invitations, role changes",
+      "description": "",
+      "deps": [
+        "T11"
+      ],
+      "files": [
+        "apps/api/src/modules/workspaces/"
+      ],
+      "acceptance": [
+        "Only owners and admins can invite or change roles (tests prove denial)",
+        "Invitation tokens are single-use and expire"
+      ],
+      "size": "M",
+      "risk": "high",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T15",
+      "title": "Projects API",
+      "description": "",
+      "deps": [
+        "T11",
+        "T13"
+      ],
+      "files": [
+        "apps/api/src/modules/projects/"
+      ],
+      "acceptance": [
+        "CRUD with policy checks",
+        "Members cannot see projects of workspaces they don't belong to (test)"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T16",
+      "title": "Tasks API: CRUD, assignment, status workflow",
+      "description": "",
+      "deps": [
+        "T11",
+        "T13"
+      ],
+      "files": [
+        "apps/api/src/modules/tasks/"
+      ],
+      "acceptance": [
+        "Status transitions follow the shared workflow; invalid transitions return 422",
+        "Assignee must be a workspace member",
+        "List endpoint is paginated"
+      ],
+      "size": "L",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T17",
+      "title": "Comments API with @mentions",
+      "description": "",
+      "deps": [
+        "T16"
+      ],
+      "files": [
+        "apps/api/src/modules/comments/"
+      ],
+      "acceptance": [
+        "Create, edit and delete own comments; admins can delete any",
+        "Mentions resolve to workspace members only"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T18",
+      "title": "Labels API",
+      "description": "",
+      "deps": [
+        "T15"
+      ],
+      "files": [
+        "apps/api/src/modules/labels/"
+      ],
+      "acceptance": [
+        "Labels are scoped to a project",
+        "Attach and detach labels on tasks with policy checks"
+      ],
+      "size": "S",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T19",
+      "title": "Task search and filtering",
+      "description": "",
+      "deps": [
+        "T16",
+        "T18"
+      ],
+      "files": [
+        "apps/api/src/modules/search/"
+      ],
+      "acceptance": [
+        "Filter by status, assignee, label and text",
+        "Queries use indexes (EXPLAIN output captured in the PR notes)"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T20",
+      "title": "Activity and audit log",
+      "description": "",
+      "deps": [
+        "T16",
+        "T17"
+      ],
+      "files": [
+        "apps/api/src/modules/activity/"
+      ],
+      "acceptance": [
+        "Task and comment changes produce activity entries",
+        "Audit entries are append-only"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T21",
+      "title": "Email notifications through a provider adapter",
+      "description": "",
+      "deps": [
+        "T17"
+      ],
+      "files": [
+        "apps/api/src/modules/notifications/"
+      ],
+      "acceptance": [
+        "Mentions and assignments enqueue emails",
+        "Provider is behind an interface with a fake used in tests",
+        "No email addresses or message bodies in logs"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T22",
+      "title": "OpenAPI spec and API reference",
+      "description": "",
+      "deps": [
+        "T14",
+        "T15",
+        "T16",
+        "T17",
+        "T18"
+      ],
+      "files": [
+        "apps/api/src/openapi/",
+        "docs/api/"
+      ],
+      "acceptance": [
+        "Spec is served at /openapi.json and validates against the OpenAPI 3 schema",
+        "docs/api/ generated from the spec"
+      ],
+      "size": "M",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T23",
+      "title": "Design-system primitives (button, input, modal, toast)",
+      "description": "",
+      "deps": [
+        "T05"
+      ],
+      "files": [
+        "apps/web/src/components/ui/"
+      ],
+      "acceptance": [
+        "Components are keyboard accessible and labelled",
+        "Component tests cover states (disabled, error, loading)"
+      ],
+      "size": "M",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T24",
+      "title": "Typed API client",
+      "description": "",
+      "deps": [
+        "T03",
+        "T05"
+      ],
+      "files": [
+        "apps/web/src/api/"
+      ],
+      "acceptance": [
+        "Requests and responses are validated with the shared schemas",
+        "Errors map to one typed error shape"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T25",
+      "title": "Auth screens: signup, login, logout",
+      "description": "",
+      "deps": [
+        "T09",
+        "T23",
+        "T24"
+      ],
+      "files": [
+        "apps/web/src/features/auth/"
+      ],
+      "acceptance": [
+        "Forms validate inline and show server errors",
+        "No credentials stored in localStorage"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T26",
+      "title": "Session handling and protected routes",
+      "description": "",
+      "deps": [
+        "T25"
+      ],
+      "files": [
+        "apps/web/src/features/session/"
+      ],
+      "acceptance": [
+        "Unauthenticated users are redirected to login",
+        "Logout clears client state"
+      ],
+      "size": "S",
+      "risk": "medium",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T27",
+      "title": "Workspace switcher and settings",
+      "description": "",
+      "deps": [
+        "T14",
+        "T26"
+      ],
+      "files": [
+        "apps/web/src/features/workspaces/"
+      ],
+      "acceptance": [
+        "Switching workspace reloads scoped data",
+        "Role-restricted settings are hidden and also rejected by the API"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T28",
+      "title": "Projects list and creation",
+      "description": "",
+      "deps": [
+        "T15",
+        "T26"
+      ],
+      "files": [
+        "apps/web/src/features/projects/"
+      ],
+      "acceptance": [
+        "Empty, loading and error states covered by tests"
+      ],
+      "size": "M",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T29",
+      "title": "Kanban task board",
+      "description": "",
+      "deps": [
+        "T16",
+        "T28"
+      ],
+      "files": [
+        "apps/web/src/features/board/"
+      ],
+      "acceptance": [
+        "Drag and drop changes status through the API with optimistic update and rollback on failure",
+        "Board is usable with the keyboard"
+      ],
+      "size": "L",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T30",
+      "title": "Task detail drawer with comments",
+      "description": "",
+      "deps": [
+        "T17",
+        "T29"
+      ],
+      "files": [
+        "apps/web/src/features/task-detail/"
+      ],
+      "acceptance": [
+        "Edit fields inline",
+        "Comment thread with mentions autocomplete"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T31",
+      "title": "Labels and filter bar",
+      "description": "",
+      "deps": [
+        "T18",
+        "T19",
+        "T29"
+      ],
+      "files": [
+        "apps/web/src/features/filters/"
+      ],
+      "acceptance": [
+        "Filters are reflected in the URL and survive reload"
+      ],
+      "size": "M",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T32",
+      "title": "Activity feed",
+      "description": "",
+      "deps": [
+        "T20",
+        "T30"
+      ],
+      "files": [
+        "apps/web/src/features/activity/"
+      ],
+      "acceptance": [
+        "Feed paginates and shows who changed what"
+      ],
+      "size": "S",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T33",
+      "title": "Notification preferences UI",
+      "description": "",
+      "deps": [
+        "T21",
+        "T26"
+      ],
+      "files": [
+        "apps/web/src/features/notifications/"
+      ],
+      "acceptance": [
+        "Users can opt out per notification type"
+      ],
+      "size": "S",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T34",
+      "title": "Accessibility audit of the core screens",
+      "agent": "code-reviewer",
+      "kind": "report",
+      "description": "Review only (lens: accessibility). The manager turns confirmed issues into follow-up tasks.",
+      "deps": [
+        "T29",
+        "T30",
+        "T31"
+      ],
+      "files": [],
+      "acceptance": [
+        "Report lists WCAG 2.2 AA issues with file:line and a suggested fix",
+        "Each issue rated by severity"
+      ],
+      "size": "S",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T35",
+      "title": "End-to-end tests for the core flows",
+      "agent": "test-engineer",
+      "description": "",
+      "deps": [
+        "T27",
+        "T30",
+        "T31"
+      ],
+      "files": [
+        "e2e/"
+      ],
+      "acceptance": [
+        "Signup -> create workspace -> project -> task -> comment flow passes headless",
+        "Tests are stable across 3 consecutive runs"
+      ],
+      "size": "L",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T36",
+      "title": "Seed data and demo script",
+      "description": "",
+      "deps": [
+        "T16",
+        "T17",
+        "T18"
+      ],
+      "files": [
+        "apps/api/scripts/seed.ts"
+      ],
+      "acceptance": [
+        "`pnpm --filter api seed` creates a demo workspace idempotently"
+      ],
+      "size": "S",
+      "risk": "low",
+      "status": "pending"
+    },
+    {
+      "id": "T37",
+      "title": "Container images and local docker-compose",
+      "description": "",
+      "deps": [
+        "T04",
+        "T05"
+      ],
+      "files": [
+        "apps/api/Dockerfile",
+        "apps/web/Dockerfile",
+        "docker-compose.yml"
+      ],
+      "acceptance": [
+        "`docker compose up` starts db, api and web; /health is green",
+        "Images run as a non-root user"
+      ],
+      "size": "M",
+      "risk": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "T38",
+      "title": "Deploy pipeline",
+      "description": "",
+      "deps": [
+        "T35",
+        "T37"
+      ],
+      "files": [
+        ".github/workflows/deploy.yml"
+      ],
+      "acceptance": [
+        "Deploy runs only from main after CI passes",
+        "Secrets come from the CI secret store, never the repo",
+        "Migrations run before the new version takes traffic"
+      ],
+      "size": "M",
+      "risk": "high",
+      "security_sensitive": true,
+      "status": "pending"
+    },
+    {
+      "id": "T39",
+      "title": "Threat model and security review of auth and workspace flows",
+      "agent": "security-reviewer",
+      "kind": "report",
+      "description": "",
+      "deps": [
+        "T12",
+        "T14",
+        "T26"
+      ],
+      "files": [],
+      "acceptance": [
+        "Report covers session handling, authorization, invitations, rate limits and data exposure",
+        "Every finding has a severity, a location and a fix"
+      ],
+      "size": "M",
+      "risk": "high",
+      "status": "pending"
+    },
+    {
+      "id": "T40",
+      "title": "README, CHANGELOG and architecture overview",
+      "agent": "docs-writer",
+      "description": "",
+      "deps": [
+        "T22",
+        "T35",
+        "T38"
+      ],
+      "files": [
+        "README.md",
+        "CHANGELOG.md",
+        "docs/architecture.md"
+      ],
+      "acceptance": [
+        "Every command in the README was run successfully",
+        "Architecture doc matches the code (module list, data flow)"
+      ],
+      "size": "S",
+      "risk": "low",
+      "status": "pending"
+    }
+  ]
+}

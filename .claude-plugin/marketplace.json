@@ -1,0 +1,14 @@
+{
+  "name": "bosun-marketplace",
+  "description": "Marketplace for the bosun multi-agent development plugin",
+  "owner": {
+    "name": "AnwarHossainSR"
+  },
+  "plugins": [
+    {
+      "name": "bosun",
+      "source": "./plugins/bosun",
+      "description": "Manager skill + 10 specialist agents for planning, parallel building, reviewing, security auditing, investigating, committing and shipping."
+    }
+  ]
+}
