@@ -208,8 +208,40 @@ class EventTests(unittest.TestCase):
         self.assertEqual(out["hookEventName"], "SubagentStart")
         self.assertIn("test: pnpm test", out["additionalContext"])
         self.assertIn("Output style: caveman", out["additionalContext"])
+        self.assertNotIn("profile cut to fit", out["additionalContext"])
         log = (self.root / ".bosun" / "activity.jsonl").read_text().splitlines()
         self.assertEqual(json.loads(log[-1])["event"], "start")
+
+    def test_long_profile_is_cut_without_losing_the_essentials(self):
+        notes = [f"note {i}: " + "x" * 400 for i in range(10)]
+        (self.root / ".bosun" / "config.json").write_text(json.dumps(
+            {"commands": {"test": "pnpm test"}, "protected_paths": ["secrets/**"],
+             "conventions": {"commit_style": "conventional", "notes": notes}}))
+        proc = self.run_hook(self.base("SubagentStart"))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        context = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertLessEqual(len(context), hooks.MAX_CONTEXT_CHARS)
+        for kept in ("test: pnpm test", "note 0:", "profile cut to fit", "protected paths (never edit): secrets/**",
+                     "- main checkout: ", "Finish with the BOSUN-RESULT block", "Output style: caveman (",
+                     "Never drop a fact"):
+            self.assertIn(kept, context)
+        self.assertNotIn("note 9:", context)
+
+    def test_protected_paths_that_do_not_fit_are_counted_not_cut(self):
+        paths = [f"services/svc-{i:03d}/secrets/**" for i in range(200)]
+        (self.root / ".bosun" / "config.json").write_text(json.dumps(
+            {"commands": {"test": "pnpm test"}, "protected_paths": paths}))
+        proc = self.run_hook(self.base("SubagentStart"))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        context = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertLessEqual(len(context), hooks.MAX_CONTEXT_CHARS)
+        line = next(x for x in context.splitlines() if x.startswith("- protected paths (never edit): "))
+        listed = line.split(": ", 1)[1].split(", ")
+        self.assertEqual(listed[0], paths[0])
+        self.assertRegex(listed[-1], r"^\d+ more in \.bosun/config\.json$")
+        self.assertEqual(len(listed) - 1 + int(listed[-1].split()[0]), len(paths))
+        for kept in ("profile cut to fit", "- main checkout: ", "Finish with the BOSUN-RESULT block", "Never drop a fact"):
+            self.assertIn(kept, context)
 
     def test_output_style_levels(self):
         def context(env=None):
@@ -219,7 +251,7 @@ class EventTests(unittest.TestCase):
         self.assertIn("telegraphic", ultra)
         self.assertIn("never for cause", ultra)
         self.assertIn("statements of uncertainty", ultra)
-        self.assertIn("because, so, but, not", ultra)
+        self.assertIn("even when dropping hedges: because, so, but, not", ultra)
         self.assertIn("Output style: caveman (", context({"BOSUN_OUTPUT_STYLE": "shouting"}))
         cfg = json.loads((self.root / ".bosun" / "config.json").read_text())
         (self.root / ".bosun" / "config.json").write_text(json.dumps(dict(cfg, output_style="normal")))
@@ -276,6 +308,20 @@ class EventTests(unittest.TestCase):
     def test_fails_open_on_garbage(self):
         proc = subprocess.run([sys.executable, str(SCRIPT)], input="not json", capture_output=True, text=True, timeout=30)
         self.assertEqual(proc.returncode, 0)
+
+
+class SkillStyleTests(unittest.TestCase):
+    def test_every_skill_restates_the_hook_style_rules(self):
+        # Skills run in the main session, which the hook never reaches, so each SKILL.md repeats the rules.
+        rule = next(r for r in hooks.STYLE_RULES if r.startswith("Keep the words that carry logic"))
+        words = rule.split(":", 1)[1].strip().rstrip(".")
+        skills = sorted((ROOT / "plugins" / "bosun" / "skills").glob("*/SKILL.md"))
+        self.assertTrue(skills)
+        for path in skills:
+            style = next((line for line in path.read_text().splitlines() if line.startswith("**Style:**")), "")
+            for part in (f"keep logic words ({words})", "destructive steps", "requests to confirm",
+                         "statements of uncertainty", "never drop a fact or an uncertainty label"):
+                self.assertIn(part, style, path.parent.name)
 
 
 if __name__ == "__main__":

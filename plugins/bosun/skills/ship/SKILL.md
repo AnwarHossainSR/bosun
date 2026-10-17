@@ -9,12 +9,13 @@ disable-model-invocation: true
 
 Arguments: $ARGUMENTS
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, may); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, can, may, must); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 ## 1. Preconditions
 
 - You're on a branch other than the base branch, and the working tree is clean. If it isn't clean, offer `/bosun:commit` and stop.
 - A remote exists and `gh auth status` succeeds. If not, explain and stop; the user can still push by hand.
+- The bosun plan, if any, is the board (`.bosun/plans/<name>/tasks.json`) whose `meta.work_branch` is the current branch. Ignore other boards: their SUMMARY.md, base branch and issue belong to other work.
 - Base branch: `--base`, else the bosun plan's `meta.base_branch`, else the repository's default branch. Run `git fetch origin <base>`. If the branch is behind `origin/<base>` or conflicts with it, tell the user and ask how to proceed (merge or rebase). Never rewrite pushed history without explicit approval.
 - If an open PR already exists for this branch (`gh pr view --json url,state`), offer to update it by pushing instead of creating another.
 
@@ -29,7 +30,7 @@ Skip with `--no-review`, or when `.bosun/reviews/` already has a review of this 
 ## 4. Write the PR
 
 - **Title**: the repository's convention (for example Conventional Commits), at most 72 characters.
-- **Body**: if the repository has a PR template (`.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, `docs/pull_request_template.md`, or `PULL_REQUEST_TEMPLATE.md`), keep its headings and fill them from the actual changes. Otherwise use: Summary, Changes, How to test, Risks and rollout, Linked issues. Draw on the commits, the bosun plan's SUMMARY.md if there is one, and the gate results. If the plan was made from a GitHub issue (`meta.issue` on the board), link it: `Closes #<n>` when the build delivered everything the issue asks for, otherwise `Refs #<n>`; tell the user which one you used, since `Closes` closes the issue when the PR merges.
+- **Body**: if the repository has a PR template (`.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, `docs/pull_request_template.md`, or `PULL_REQUEST_TEMPLATE.md`), keep its headings and fill them from the actual changes. Otherwise use: Summary, Changes, How to test, Risks and rollout, Linked issues. Draw on the commits, the bosun plan's SUMMARY.md if there is one, and the gate results. Link the GitHub issue the work comes from: the plan's `meta.issue`, or, without a plan, an issue the commits reference or the user names. Write it as `#<n>` for an issue in this repository, `<owner>/<repo>#<n>` for one in another. Write `Closes` when the work delivers everything the issue asks for and the PR targets the default branch, otherwise `Refs`. GitHub acts on closing keywords only in PRs to the default branch, so tell the user which keyword you used and whether merging will close the issue.
 - Don't invent issue numbers, test results, screenshots or metrics. Report only checks you actually ran.
 - Write the body to a temp file.
 

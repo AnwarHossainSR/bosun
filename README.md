@@ -60,9 +60,9 @@ claude plugin install bosun@bosun-marketplace
 claude plugin marketplace add AnwarHossainSR/bosun --scope project
 claude plugin install bosun@bosun-marketplace --scope project
 ```
-This writes `extraKnownMarketplaces` and `enabledPlugins` to the project's `.claude/settings.json`; commit that file. Teammates get bosun after they accept the folder's trust prompt: the marketplace lists the plugin by a relative path, and the [Claude Code plugin docs](https://code.claude.com/docs/en/plugins/install.md) say such a plugin loads from the marketplace copy without a separate install. I haven't tried that with a second account. To follow a specific branch or tag, add it after `#`, for example `AnwarHossainSR/bosun#main`.
+This writes `extraKnownMarketplaces` and `enabledPlugins` to the project's `.claude/settings.json`; commit that file. Teammates get bosun after they accept the folder's trust prompt: the marketplace lists the plugin by a relative path, and the [Claude Code plugin loading docs](https://code.claude.com/docs/en/plugins/loading#enabled-in-project-settings-but-not-installed) say such a plugin needs no separate install because it loads from the marketplace itself. I haven't tried that with a second account; if bosun doesn't appear for a teammate, they can run the `install` command above once, as the [install docs](https://code.claude.com/docs/en/plugins/install#choose-an-install-scope) describe for project scope. To follow a specific branch or tag, add it after `#`, for example `AnwarHossainSR/bosun#main`.
 
-**D. Claude Code on the web (cloud sessions).** Cloud sessions don't load plugins installed on your own machine or turned on in the repository's `.claude/settings.json` (documented in the same docs). Install bosun inside the cloud container instead, by adding these lines to the environment's setup script (the environment menu in the session's title bar, then Edit, then Setup script), which runs when each new session starts:
+**D. Claude Code on the web (cloud sessions).** Cloud sessions don't load plugins installed on your own machine or turned on in the repository's `.claude/settings.json` (see the Cloud session tab of the [install docs](https://code.claude.com/docs/en/plugins/install)). Install bosun inside the cloud container instead, by adding these lines to the environment's setup script (the environment menu in the session's title bar, then Edit, then Setup script), which runs when each new session starts:
 ```bash
 claude plugin marketplace add AnwarHossainSR/bosun
 claude plugin install bosun@bosun-marketplace
@@ -220,7 +220,7 @@ Agent reports flow into the manager's context, and the manager's updates flow to
 | `caveman-ultra` | telegraphic; common abbreviations |
 | `normal` | unchanged |
 
-`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text adds roughly 150-200 tokens per agent start (estimated from its length).
+`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text adds roughly 200 tokens per agent start (estimated from its length, about 810-870 characters). When the project profile and the style together would pass 4,000 characters, the profile drops its last convention notes first, then lists only as many protected paths as fit and counts the rest (the guard still enforces all of them for Edit and Write); the main checkout and the result reminder always stay.
 
 How much it saves, measured on a small sample: agents wrote four typical bosun messages (an implementer result, review findings, an investigation report, a progress update) in normal prose; other agents rewrote each one at every level with these rules, and separate agents checked each rewrite for lost facts.
 
