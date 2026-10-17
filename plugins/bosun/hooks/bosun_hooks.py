@@ -729,6 +729,9 @@ def build_context(data):
 
 
 def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
+    """The profile in at most `limit` characters. Too long: drop the last body lines (convention notes
+    first), then list fewer protected paths and count the rest. The main checkout and the result reminder
+    always stay, so only an absurdly long checkout path can push the profile past the limit."""
     head = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
     commands = cfg.get("commands") or {}
     body = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
@@ -738,21 +741,26 @@ def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
         body.append(f"- commit style: {conventions['commit_style']}")
     for note in (conventions.get("notes") or [])[:10]:
         body.append(f"- convention: {note}")
-    tail = []
     protected = [p for p in cfg.get("protected_paths") or [] if isinstance(p, str)]
-    if protected:
-        tail.append("- protected paths (never edit): " + ", ".join(protected))
-    tail.append(f"- main checkout: {root}")
-    tail.append(f"Finish with the {RESULT_MARKER} block from your instructions.")
-    lines = head + body + tail
-    if len("\n".join(lines)) > limit:
-        # Too long: drop the last free-form lines (convention notes first), never the protected paths,
-        # the main checkout or the result reminder, and say that something was left out.
-        cut = "- (profile cut to fit; the rest is in .bosun/config.json)"
-        while body and len("\n".join(head + body + [cut] + tail)) > limit:
-            body.pop()
-        lines = head + body + [cut] + tail
-    return "\n".join(lines)[:limit]
+    tail = [f"- main checkout: {root}", f"Finish with the {RESULT_MARKER} block from your instructions."]
+
+    def render(shown, cut):
+        lines = head + body + (["- (profile cut to fit; the rest is in .bosun/config.json)"] if cut else [])
+        if protected:
+            listed = protected[:shown]
+            if shown < len(protected):
+                listed.append(f"{len(protected) - shown} more in .bosun/config.json")
+            lines.append("- protected paths (never edit): " + ", ".join(listed))
+        return "\n".join(lines + tail)
+
+    shown = len(protected)
+    if len(render(shown, False)) <= limit:
+        return render(shown, False)
+    while body and len(render(shown, True)) > limit:
+        body.pop()
+    while shown and len(render(shown, True)) > limit:
+        shown -= 1
+    return render(shown, True)
 
 
 def handle(data):

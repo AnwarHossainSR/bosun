@@ -220,7 +220,7 @@ Agent reports flow into the manager's context, and the manager's updates flow to
 | `caveman-ultra` | telegraphic; common abbreviations |
 | `normal` | unchanged |
 
-`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text adds roughly 200 tokens per agent start (estimated from its length, about 810-870 characters). When the project profile and the style together would pass 4,000 characters, the profile drops its last convention notes first; the protected paths, the main checkout and the result reminder always stay.
+`BOSUN_OUTPUT_STYLE=normal` (or another level) overrides the config for a session. The style text adds roughly 200 tokens per agent start (estimated from its length, about 810-870 characters). When the project profile and the style together would pass 4,000 characters, the profile drops its last convention notes first, then lists only as many protected paths as fit and counts the rest (the guard still enforces all of them for Edit and Write); the main checkout and the result reminder always stay.
 
 How much it saves, measured on a small sample: agents wrote four typical bosun messages (an implementer result, review findings, an investigation report, a progress update) in normal prose; other agents rewrote each one at every level with these rules, and separate agents checked each rewrite for lost facts.
 

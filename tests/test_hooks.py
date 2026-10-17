@@ -227,6 +227,22 @@ class EventTests(unittest.TestCase):
             self.assertIn(kept, context)
         self.assertNotIn("note 9:", context)
 
+    def test_protected_paths_that_do_not_fit_are_counted_not_cut(self):
+        paths = [f"services/svc-{i:03d}/secrets/**" for i in range(200)]
+        (self.root / ".bosun" / "config.json").write_text(json.dumps(
+            {"commands": {"test": "pnpm test"}, "protected_paths": paths}))
+        proc = self.run_hook(self.base("SubagentStart"))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        context = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertLessEqual(len(context), hooks.MAX_CONTEXT_CHARS)
+        line = next(x for x in context.splitlines() if x.startswith("- protected paths (never edit): "))
+        listed = line.split(": ", 1)[1].split(", ")
+        self.assertEqual(listed[0], paths[0])
+        self.assertRegex(listed[-1], r"^\d+ more in \.bosun/config\.json$")
+        self.assertEqual(len(listed) - 1 + int(listed[-1].split()[0]), len(paths))
+        for kept in ("profile cut to fit", "- main checkout: ", "Finish with the BOSUN-RESULT block", "Never drop a fact"):
+            self.assertIn(kept, context)
+
     def test_output_style_levels(self):
         def context(env=None):
             proc = self.run_hook(self.base("SubagentStart"), env)
