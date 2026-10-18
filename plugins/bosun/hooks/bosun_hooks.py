@@ -104,7 +104,7 @@ STYLE_LEVELS = {
 STYLE_RULES = (
     "Keep exact: code, commands, paths, identifiers, error text, numbers, versions, and text quoted from specs, "
     "tests or hypotheses.",
-    "Keep the words that carry logic: because, so, but, not, only, can, may, must.",
+    "Keep the words that carry logic, even when dropping hedges: because, so, but, not, only, can, may, must.",
     "Write normally: code comments, commit messages, PR text, docs, OpenSpec files, user-facing strings.",
     "Use plain full sentences for security warnings, destructive or irreversible steps, ordered instructions, "
     "questions, requests to confirm or decide, and statements of uncertainty.",
@@ -721,28 +721,57 @@ def build_context(data):
     root = project_dir(data)
     cfg = load_config(root)
     style = style_context(output_style(cfg))
-    profile = project_profile(root, cfg) if root else None
+    room = MAX_CONTEXT_CHARS - len(style) - 2 if style else MAX_CONTEXT_CHARS
+    profile = project_profile(root, cfg, room) if root else None
     if profile and style:
-        return profile[:MAX_CONTEXT_CHARS - len(style) - 2] + "\n\n" + style
+        return profile + "\n\n" + style
     return profile or style
 
 
-def project_profile(root, cfg):
-    lines = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
+def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
+    """The profile in at most `limit` characters. Too long: drop the last convention notes, then list fewer
+    protected paths and count the rest, then drop commit style and commands (and list as many protected
+    paths as that frees room for). The main checkout and the result reminder always stay, so only an
+    absurdly long checkout path can push the profile past the limit."""
+    head = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
     commands = cfg.get("commands") or {}
-    shown = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
-    lines += shown or ["- no commands configured: find them in package scripts, Makefile, or CI config"]
+    body = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
+    body = body or ["- no commands configured: find them in package scripts, Makefile, or CI config"]
     conventions = cfg.get("conventions") or {}
     if conventions.get("commit_style"):
-        lines.append(f"- commit style: {conventions['commit_style']}")
-    for note in (conventions.get("notes") or [])[:10]:
-        lines.append(f"- convention: {note}")
+        body.append(f"- commit style: {conventions['commit_style']}")
+    notes = [f"- convention: {note}" for note in (conventions.get("notes") or [])[:10]]
     protected = [p for p in cfg.get("protected_paths") or [] if isinstance(p, str)]
-    if protected:
-        lines.append("- protected paths (never edit): " + ", ".join(protected))
-    lines.append(f"- main checkout: {root}")
-    lines.append(f"Finish with the {RESULT_MARKER} block from your instructions.")
-    return "\n".join(lines)[:MAX_CONTEXT_CHARS]
+    tail = [f"- main checkout: {root}", f"Finish with the {RESULT_MARKER} block from your instructions."]
+
+    def render(shown, cut):
+        lines = head + body + notes + (["- (profile cut to fit; the rest is in .bosun/config.json)"] if cut else [])
+        if protected:
+            listed = protected[:shown]
+            if shown < len(protected):
+                listed.append(f"{len(protected) - shown} more in .bosun/config.json")
+            lines.append("- protected paths (never edit): " + ", ".join(listed))
+        return "\n".join(lines + tail)
+
+    def most_protected():
+        # Largest count that fits (0 if none does), by bisection: below len(protected) the length grows with
+        # the count, and re-rendering a long list once per dropped path could outlast the hook's timeout.
+        if len(render(len(protected), True)) <= limit:
+            return len(protected)
+        low, high = 0, max(len(protected) - 1, 0)
+        while low < high:
+            mid = (low + high + 1) // 2
+            low, high = (mid, high) if len(render(mid, True)) <= limit else (low, mid - 1)
+        return low
+
+    if len(render(len(protected), False)) <= limit:
+        return render(len(protected), False)
+    while notes and len(render(len(protected), True)) > limit:
+        notes.pop()
+    shown = most_protected()
+    while body and len(render(shown, True)) > limit:
+        body.pop()
+    return render(most_protected(), True)
 
 
 def handle(data):

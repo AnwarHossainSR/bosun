@@ -8,7 +8,7 @@ argument-hint: "[staged | working | <base>...<head> | <commit>] [--lenses correc
 
 Target: $ARGUMENTS
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, may); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, can, may, must); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 ## 1. Resolve the target
 
@@ -53,5 +53,7 @@ Write `.bosun/reviews/<YYYY-MM-DD>-<slug>.md`, including the reviewed range and 
 Be specific and calm. No padding, no filler praise.
 
 ## 7. --fix
+
+Fixes land in the working tree, so `--fix` needs every file a fix will touch to hold exactly the reviewed code there. The default target and `working` always do. For `staged`, the file must have no unstaged changes (not in `git diff --name-only`). For a range or a commit, its head must be `HEAD` (`git rev-parse <head>^{commit}` equals `git rev-parse HEAD`; the `^{commit}` makes annotated tags compare as their commit) and the file must have no uncommitted changes (not in `git diff --name-only HEAD`). Otherwise don't change anything: name the files that differ, and let the user check out the head, or commit or stash their edits, first.
 
 Apply fixes for confirmed critical, high and medium findings: trivial ones yourself, larger ones through `bosun:implementer` in shared mode (no `isolation`, with the files it owns), so the fixes land uncommitted in the working tree. Re-run the checks, then re-review only the changed areas with a `bosun:code-reviewer` (or `bosun:security-reviewer`) using the lens that raised each finding. Don't commit unless the user asks (`/bosun:commit`).

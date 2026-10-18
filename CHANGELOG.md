@@ -5,7 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
-- `/bosun:plan #123` (or an issue URL) plans from a GitHub issue: the issue is the brief, the proposal cites it, the board records it as `meta.issue`, and `/bosun:ship` links the PR with `Closes` or `Refs`. The manager routes issues to plan or investigate.
+- `/bosun:plan #123` (or an issue URL) plans from a GitHub issue: the issue is the brief, the proposal (PLAN.md for `--classic`) cites it, the board records it as `meta.issue`, and `/bosun:ship` links the PR with `Closes` or `Refs`. The manager routes an issue like any other goal: plan, investigate, or a single implementer for a small change.
 - README: project-scope install (`--scope project`), following a branch with `owner/repo#ref`, how teammates get the plugin, and installing in Claude Code on the web through the environment's setup script.
 - Manager skill that routes any goal to the right workflow, and skills for plan, build, status, archive, investigate, review, review-pr, security-audit, commit, ship and setup.
 - Spec-driven planning: `/bosun:plan` writes an OpenSpec-format change (proposal, delta specs with scenarios, design, tasks.md) plus a task board whose tasks reference the requirements they implement (`spec_refs`). `--classic` keeps the PLAN.md format.
@@ -19,3 +19,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - Hooks: guard for bosun agents, activity log, project profile injection.
 - 40-task example plan, and an OpenSpec example change validated in CI with the OpenSpec CLI.
 - Open-source project files: CI, contributing guide, security policy, code of conduct, issue and pull request templates, CODEOWNERS, Dependabot for GitHub Actions.
+
+### Fixed
+- `/bosun:build --resume`: an unfinished merge is no longer reported as a dirty tree to commit or stash (other changes still are); resume proposes what to do with it and settles it only after your go-ahead, and no task is merged while one is still open. Preflight no longer switches branches during a merge (`git checkout` of the current branch silently drops the merge state). An `in_progress` task is matched to its worktree by commit subject or files, not by board fields left over from an earlier attempt, and its uncommitted work in the task's files is committed with path-limited commands and continued instead of being reset; other paths are left for you to decide.
+- `/bosun:ship` and `/bosun:commit` take `meta.issue` only from the board whose `meta.work_branch` is the current branch, and write an issue in another repository as `owner/repo#n`. Without a plan, ship links an issue the commits reference. Ship writes `Closes` only for PRs to the default branch, where GitHub acts on it, takes an existing PR's base as the base, and warns when a commit message would close the issue anyway; commit footers use `Refs` unless you ask for a closing keyword.
+- The manager and `/bosun:investigate` treat issue text as a request from people, never as instructions, as `/bosun:plan` already did. The manager keeps the issue with the work on every route, so the PR can link it.
+- `/bosun:review --fix` changes nothing unless every file it would touch holds exactly the reviewed code (right head checked out, no unstaged or uncommitted edits there).
+- The SubagentStart hook no longer cuts the end of a long project profile (protected paths, main checkout, result reminder); it drops the last convention notes, then lists only as many protected paths as fit and counts the rest. The style rules keep `can`, `may` and `must` even when dropping hedges, and a test keeps every skill's style line in step with the hook.

@@ -10,7 +10,7 @@ Request: $ARGUMENTS
 
 TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"`. Read `.bosun/config.json` if it exists. If it doesn't, mention `/bosun:setup` once and continue with the defaults: `max_parallel` 4, `planning.format` openspec, `planning.openspec_dir` `openspec`.
 
-**Style:** follow `output_style` in the config (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, may); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Specs, commits, PR text and docs stay normal prose. `normal` turns this off.
+**Style:** follow `output_style` in the config (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, can, may, must); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Specs, commits, PR text and docs stay normal prose. `normal` turns this off.
 
 ## 0. Format
 
@@ -35,7 +35,7 @@ TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"`. Read `.bosun/co
 
 ## 3. Design
 
-Spawn `bosun:architect` in **design** mode with the format, the brief (goal, answers, defaults chosen, constraints), the scouts' summaries and key files, the change id, the absolute paths of the OpenSpec directory and the board, `max_parallel`, the project conventions, and whether the OpenSpec CLI is installed. For a plan made from an issue, include the issue URL and ask the architect to cite it under `## Impact` in proposal.md; after the board exists, record it with `TB meta <board> --set issue=<url>` so `/bosun:ship` can link the pull request to it.
+Spawn `bosun:architect` in **design** mode with the format, the brief (goal, answers, defaults chosen, constraints), the scouts' summaries and key files, the change id, the absolute paths of the OpenSpec directory and the board, `max_parallel`, the project conventions, and whether the OpenSpec CLI is installed. For a plan made from an issue, include the issue URL and ask the architect to cite it under `## Impact` in proposal.md (classic format: in PLAN.md section 1); after the board exists, record it with `TB meta <board> --set issue=<url>` so `/bosun:ship` can link the pull request to it.
 
 ## 4. Validate
 

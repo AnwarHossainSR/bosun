@@ -11,7 +11,7 @@ Arguments: $ARGUMENTS
 
 TB means `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"`. Run every `openspec` command with `OPENSPEC_TELEMETRY=0` set, from the repository root.
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): terse fragments for your own prose; exact commands, paths and errors; keep logic words (because, so, but, not); full sentences for warnings, questions and requests to confirm; never drop a fact. Commit messages stay normal prose.
+**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, can, may, must); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
 
 ## 1. Resolve the change
 
