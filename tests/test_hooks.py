@@ -240,7 +240,8 @@ class EventTests(unittest.TestCase):
         self.assertEqual(listed[0], paths[0])
         self.assertRegex(listed[-1], r"^\d+ more in \.bosun/config\.json$")
         self.assertEqual(len(listed) - 1 + int(listed[-1].split()[0]), len(paths))
-        for kept in ("profile cut to fit", "- main checkout: ", "Finish with the BOSUN-RESULT block", "Never drop a fact"):
+        for kept in ("test: pnpm test", "profile cut to fit", "- main checkout: ", "Finish with the BOSUN-RESULT block",
+                     "Never drop a fact"):
             self.assertIn(kept, context)
 
     def test_output_style_levels(self):

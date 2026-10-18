@@ -729,9 +729,9 @@ def build_context(data):
 
 
 def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
-    """The profile in at most `limit` characters. Too long: drop the last body lines (convention notes
-    first), then list fewer protected paths and count the rest. The main checkout and the result reminder
-    always stay, so only an absurdly long checkout path can push the profile past the limit."""
+    """The profile in at most `limit` characters. Too long: drop the last convention notes, then list fewer
+    protected paths and count the rest, then drop commit style and commands. The main checkout and the
+    result reminder always stay, so only an absurdly long checkout path can push the profile past the limit."""
     head = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
     commands = cfg.get("commands") or {}
     body = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
@@ -739,13 +739,12 @@ def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
     conventions = cfg.get("conventions") or {}
     if conventions.get("commit_style"):
         body.append(f"- commit style: {conventions['commit_style']}")
-    for note in (conventions.get("notes") or [])[:10]:
-        body.append(f"- convention: {note}")
+    notes = [f"- convention: {note}" for note in (conventions.get("notes") or [])[:10]]
     protected = [p for p in cfg.get("protected_paths") or [] if isinstance(p, str)]
     tail = [f"- main checkout: {root}", f"Finish with the {RESULT_MARKER} block from your instructions."]
 
     def render(shown, cut):
-        lines = head + body + (["- (profile cut to fit; the rest is in .bosun/config.json)"] if cut else [])
+        lines = head + body + notes + (["- (profile cut to fit; the rest is in .bosun/config.json)"] if cut else [])
         if protected:
             listed = protected[:shown]
             if shown < len(protected):
@@ -756,10 +755,12 @@ def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
     shown = len(protected)
     if len(render(shown, False)) <= limit:
         return render(shown, False)
-    while body and len(render(shown, True)) > limit:
-        body.pop()
+    while notes and len(render(shown, True)) > limit:
+        notes.pop()
     while shown and len(render(shown, True)) > limit:
         shown -= 1
+    while body and len(render(shown, True)) > limit:
+        body.pop()
     return render(shown, True)
 
 
