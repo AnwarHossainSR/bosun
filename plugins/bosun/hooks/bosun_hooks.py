@@ -730,8 +730,9 @@ def build_context(data):
 
 def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
     """The profile in at most `limit` characters. Too long: drop the last convention notes, then list fewer
-    protected paths and count the rest, then drop commit style and commands. The main checkout and the
-    result reminder always stay, so only an absurdly long checkout path can push the profile past the limit."""
+    protected paths and count the rest, then drop commit style and commands (and list as many protected
+    paths as that frees room for). The main checkout and the result reminder always stay, so only an
+    absurdly long checkout path can push the profile past the limit."""
     head = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
     commands = cfg.get("commands") or {}
     body = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
@@ -752,16 +753,25 @@ def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
             lines.append("- protected paths (never edit): " + ", ".join(listed))
         return "\n".join(lines + tail)
 
-    shown = len(protected)
-    if len(render(shown, False)) <= limit:
-        return render(shown, False)
-    while notes and len(render(shown, True)) > limit:
+    def most_protected():
+        # Largest count that fits (0 if none does), by bisection: below len(protected) the length grows with
+        # the count, and re-rendering a long list once per dropped path could outlast the hook's timeout.
+        if len(render(len(protected), True)) <= limit:
+            return len(protected)
+        low, high = 0, max(len(protected) - 1, 0)
+        while low < high:
+            mid = (low + high + 1) // 2
+            low, high = (mid, high) if len(render(mid, True)) <= limit else (low, mid - 1)
+        return low
+
+    if len(render(len(protected), False)) <= limit:
+        return render(len(protected), False)
+    while notes and len(render(len(protected), True)) > limit:
         notes.pop()
-    while shown and len(render(shown, True)) > limit:
-        shown -= 1
+    shown = most_protected()
     while body and len(render(shown, True)) > limit:
         body.pop()
-    return render(shown, True)
+    return render(most_protected(), True)
 
 
 def handle(data):

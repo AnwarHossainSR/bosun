@@ -240,8 +240,22 @@ class EventTests(unittest.TestCase):
         self.assertEqual(listed[0], paths[0])
         self.assertRegex(listed[-1], r"^\d+ more in \.bosun/config\.json$")
         self.assertEqual(len(listed) - 1 + int(listed[-1].split()[0]), len(paths))
+        # As many as fit: one more path (minus at most one digit off the count) would pass the limit.
+        self.assertGreater(len(context) + len(", " + paths[len(listed) - 1]) - 1, hooks.MAX_CONTEXT_CHARS)
         for kept in ("test: pnpm test", "profile cut to fit", "- main checkout: ", "Finish with the BOSUN-RESULT block",
                      "Never drop a fact"):
+            self.assertIn(kept, context)
+
+    def test_oversized_command_is_dropped_and_protected_paths_come_back(self):
+        (self.root / ".bosun" / "config.json").write_text(json.dumps(
+            {"commands": {"test": "pnpm test", "build": "x" * 3500}, "protected_paths": ["secrets/**"]}))
+        proc = self.run_hook(self.base("SubagentStart"))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        context = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertLessEqual(len(context), hooks.MAX_CONTEXT_CHARS)
+        self.assertNotIn("x" * 100, context)
+        for kept in ("test: pnpm test", "protected paths (never edit): secrets/**\n", "- main checkout: ",
+                     "Finish with the BOSUN-RESULT block", "Never drop a fact"):
             self.assertIn(kept, context)
 
     def test_output_style_levels(self):
