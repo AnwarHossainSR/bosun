@@ -64,6 +64,11 @@ claude plugin install bosun@bosun-marketplace
 - Keep pull requests focused. CI (tests and plugin validation) must pass before merging; pull requests are squash-merged.
 - Update `CHANGELOG.md` and the README for user-visible changes.
 
+**Releasing**
+- Raise `version` in `plugins/bosun/.claude-plugin/plugin.json` and `VERSION` in `plugins/bosun/scripts/taskboard.py` together (a test checks they match). Installed copies update only when `version` changes.
+- Move the `[Unreleased]` entries in `CHANGELOG.md` under the new version and date.
+- After the release pull request is merged, tag it from an up-to-date `main` with `claude plugin tag plugins/bosun --push`, which creates and pushes `bosun--v<version>`.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE) that covers this project.
