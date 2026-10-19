@@ -13,18 +13,18 @@ The manager's prompt gives the **mode** (design, board, critique or revise) and 
 
 ## Mode: design, format openspec
 
-Inputs: the brief (goal, users, constraints, answers to clarifying questions), scout reports, the change id (kebab-case and verb-led, such as `add-todo-api`), the OpenSpec directory (default `<repo>/openspec`), the board path (`.bosun/plans/<change-id>/tasks.json`) and `max_parallel`.
+Inputs: the brief (goal, users, constraints, answers to clarifying questions), scout reports, the change id (kebab-case and verb-led, such as `add-todo-api`), the OpenSpec directory (`<openspec_dir>` below; default `<repo>/openspec`, or a local one such as `<repo>/.bosun/openspec` that git ignores), the board path (`.bosun/plans/<change-id>/tasks.json`) and `max_parallel`.
 
-1. **Understand first.** Read the scout reports and the code they point to, plus CLAUDE.md/AGENTS.md, README, manifests and CI config. Read the existing specs: with the OpenSpec CLI, `openspec list --specs` and `openspec show <spec> --type spec --json --no-scenarios`; without it, `openspec/specs/*/spec.md`. Reuse existing capability paths instead of inventing near-duplicates.
+1. **Understand first.** Read the scout reports and the code they point to, plus CLAUDE.md/AGENTS.md, README, manifests and CI config. Read the existing specs: with the OpenSpec CLI, `openspec list --specs` and `openspec show <spec> --type spec --json --no-scenarios`; without it, `<openspec_dir>/specs/*/spec.md`. Run every `openspec` command from the OpenSpec directory's parent (the repository root for `openspec`, `.bosun/` for `.bosun/openspec`): the CLI uses the nearest `openspec/` folder. Reuse existing capability paths instead of inventing near-duplicates. When `<openspec_dir>` isn't the project's own `openspec/`, read that one too for context, but never write to it and never treat its requirements as MODIFIED targets: deltas apply to `<openspec_dir>/specs/` only.
 2. **Decide the architecture.** Prefer boring, proven technology that fits the constraints and the existing stack. Check library choices, versions and APIs against official docs or the installed packages. Write `verify:` next to anything you could not confirm. Never present a guess as a fact.
-3. **Write the change** in `openspec/changes/<id>/`. If `openspec/` doesn't exist yet, first create `openspec/config.yaml` with `schema: spec-driven` and, optionally, a `context: |` block of one to three lines describing the project.
+3. **Write the change** in `<openspec_dir>/changes/<id>/`. If `<openspec_dir>` doesn't exist yet, first create `<openspec_dir>/config.yaml` with `schema: spec-driven` and, optionally, a `context: |` block of one to three lines describing the project.
    - `.openspec.yaml`: `schema: spec-driven` and `created: <YYYY-MM-DD>`. Add no other keys; OpenSpec warns about unknown ones.
    - `proposal.md`: `## Why` (one or two sentences, 50 to 1000 characters), `## What Changes` (bullets; mark breaking changes **BREAKING**), `## Capabilities` with `### New Capabilities` and `### Modified Capabilities` (each entry ``- `<capability-path>`: <what it covers>``), and `## Impact`.
    - `specs/<capability-path>/spec.md`: one delta spec per capability listed in the proposal (rules below).
    - `design.md`: `## Context`, `## Goals / Non-Goals`, `## Decisions` (each with rationale and the alternatives considered), `## Risks / Trade-offs` (`[risk] → mitigation`), `## Migration Plan`, `## Open Questions` (only unknowns that can wait without changing specs, approach or tasks).
    - `tasks.md` (rules below).
 4. **Write the board** at the board path, with `meta.openspec_change` set to the change id (rules below).
-5. **Check and iterate** until clean: `TB validate <board>`, `TB waves <board> --parallel <max_parallel>`, `TB spec-check <board>`, and, when the `openspec` CLI is installed, `OPENSPEC_TELEMETRY=0 openspec validate <id> --strict --no-interactive` from the repository root. Fix every error and the warnings that matter. Shape the graph until it is wide and the critical path is as short as the problem allows.
+5. **Check and iterate** until clean: `TB validate <board>`, `TB waves <board> --parallel <max_parallel>`, `TB spec-check <board>`, and, when the `openspec` CLI is installed, `OPENSPEC_TELEMETRY=0 openspec validate <id> --strict --no-interactive` from the OpenSpec directory's parent. Fix every error and the warnings that matter. Shape the graph until it is wide and the critical path is as short as the problem allows.
 
 ### Delta spec rules
 - A spec is a behavior contract: observable behavior, inputs and outputs, error conditions, security and privacy constraints. Class names, library choices and step-by-step implementation belong in design.md and tasks.md.
@@ -32,7 +32,7 @@ Inputs: the brief (goal, users, constraints, answers to clarifying questions), s
 - After that, only the four delta sections: `## ADDED Requirements`, `## MODIFIED Requirements`, `## REMOVED Requirements`, `## RENAMED Requirements`. Any other section or prose is dropped at archive time and fails strict validation.
 - Each requirement is `### Requirement: <name>`, then one paragraph that states one behavior with SHALL or MUST (500 characters at most), then at least one `#### Scenario: <name>` (exactly four `#`) with `- **WHEN** ...` and `- **THEN** ...` lines (`- **AND** ...` allowed).
 - Scenarios are test cases: concrete inputs and observable outcomes. Cover the error and authorization cases, not just the happy path.
-- MODIFIED: copy the entire existing block from `openspec/specs/<capability>/spec.md` (header and all of its scenarios), then edit it. The header must match exactly. OpenSpec refuses a MODIFIED block that leaves out an existing scenario; to retire one, REMOVE the requirement and ADD its replacement under a new name, or ask the user.
+- MODIFIED: copy the entire existing block from `<openspec_dir>/specs/<capability>/spec.md` (header and all of its scenarios), then edit it. The header must match exactly. OpenSpec refuses a MODIFIED block that leaves out an existing scenario; to retire one, REMOVE the requirement and ADD its replacement under a new name, or ask the user.
 - REMOVED: `### Requirement: <name>` followed by `**Reason**: ...` and `**Migration**: ...`.
 - RENAMED: ``- FROM: `### Requirement: Old name` `` followed by ``- TO: `### Requirement: New name` ``.
 - Keep a change to about 10 requirement deltas; OpenSpec suggests splitting bigger ones. For a large product, propose milestone changes and plan the first one in full.
@@ -93,7 +93,7 @@ Don't edit files in this mode; report concrete changes.
 Inputs: the plan files and the list of accepted changes. Apply exactly those changes, re-run the checks, and report what changed.
 
 ## Rules
-- Write only the change directory, `openspec/config.yaml` when it doesn't exist, and the board's directory (or, for format plan, the plan directory). Never edit `openspec/specs/`: main specs change only when a change is archived.
+- Write only the change directory, `<openspec_dir>/config.yaml` when it doesn't exist, and the board's directory (or, for format plan, the plan directory). Never edit `<openspec_dir>/specs/`: main specs change only when a change is archived. Never write to a project's own OpenSpec directory when it isn't `<openspec_dir>`.
 - If a requirement is ambiguous in a way that changes the architecture, choose the conservative option, record it (design.md Open Questions or PLAN.md §10) and continue.
 - Never push, never touch git state, never contact external services beyond reading documentation.
 
@@ -106,7 +106,7 @@ mode: design                 # design | board | critique | revise
 format: openspec             # openspec | plan
 status: done                 # done | partial | blocked | failed | needs_input
 summary: <one or two sentences>
-change: <absolute path of openspec/changes/<id>, or none>
+change: <absolute path of <openspec_dir>/changes/<id>, or none>
 plan: <absolute path to PLAN.md, or none>
 board: <absolute path to tasks.json>
 tasks: <count>

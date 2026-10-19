@@ -145,6 +145,17 @@ class PathRuleTests(unittest.TestCase):
         self.assertIsNotNone(self.check("docs/openspec/changes/add-x/proposal.md"))
         self.assertIsNone(self.check("openspec/changes/add-x/proposal.md"))
 
+    def test_local_openspec_dir_next_to_the_projects_own(self):
+        (self.root / ".bosun" / "config.json").write_text(json.dumps(
+            {"planning": {"openspec_dir": ".bosun/openspec"}, "protected_paths": ["openspec/**"]}))
+        local = ".bosun/openspec/changes/add-x/specs/auth/spec.md"
+        self.assertIsNotNone(self.check(local))
+        self.assertIsNotNone(self.check(local, worktree=True))
+        self.assertIsNone(self.check(local, agent="bosun:architect"))
+        for rel in ("openspec/changes/their-change/tasks.md", "openspec/specs/auth/spec.md"):
+            self.assertIsNotNone(self.check(rel), rel)
+            self.assertIsNotNone(self.check(rel, agent="bosun:architect"), rel)
+
     def test_allowed_paths(self):
         self.assertIsNone(self.check("src/app.ts"))
         self.assertIsNone(self.check("src/app.ts", worktree=True))
