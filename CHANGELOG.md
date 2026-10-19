@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-19
+
+### Added
+- A local OpenSpec directory for projects that use OpenSpec themselves: set `planning.openspec_dir` to `.bosun/openspec`, with `openspec/**` in `protected_paths`. bosun's changes, tasks.md ticks and archived specs then stay in that git-ignored folder: the build never stages or commits them, agents in worktrees read the change from the main checkout, and `/bosun:archive` backs the folder up instead of committing. `/bosun:setup` offers it when the project already has its own `openspec/`.
+
+### Fixed
+- OpenSpec CLI commands run from the OpenSpec directory's parent instead of the repository root. The CLI uses the nearest `openspec/` folder, so with a custom `planning.openspec_dir` it used to read the project's own specs, and validation and archiving could miss bosun's change or act on the wrong one.
+- Skills and agents that named `openspec/` literally now follow `planning.openspec_dir`.
+
 ## [0.2.0] - 2026-10-19
 
 ### Added

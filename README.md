@@ -209,6 +209,22 @@ How bosun uses it:
 
 Already have an OpenSpec change, written by hand or with OpenSpec's own commands? `/bosun:plan <change-id>` only adds the board. Prefer a plain plan? Use `/bosun:plan --classic ...` or set `"planning": {"format": "plan"}`.
 
+### Next to your own OpenSpec, kept out of git
+
+If the project already uses OpenSpec for its own work, or you don't want bosun's specs in git, give bosun its own local directory in `.bosun/config.json` (`/bosun:setup` offers this when it finds an `openspec/` that isn't bosun's):
+
+```json
+{
+  "planning": { "format": "openspec", "openspec_dir": ".bosun/openspec" },
+  "protected_paths": ["openspec/**"]
+}
+```
+
+- bosun's changes, tasks.md ticks and archived specs then live in `.bosun/openspec/`, which git ignores along with the rest of `.bosun/`. A git-ignored OpenSpec directory is never staged or committed: the build skips those commits, and `/bosun:archive` makes a backup in `.bosun/backups/` instead of a commit.
+- Your own `openspec/` stays yours. `protected_paths` stops bosun agents from editing it (Edit and Write calls; the guard can't see inside shell commands), and the architect reads its specs only for context.
+- bosun runs the OpenSpec CLI from `.bosun/`, because the CLI uses the nearest `openspec/` folder; from the repository root it would act on your specs instead. This was checked with OpenSpec 1.14.2, and a test covers it when the CLI is installed.
+- Agents' worktrees don't get git-ignored files (unless a `.worktreeinclude` copies them in), so agents read the change from the main checkout, through the absolute paths and the quoted requirements in their task brief.
+
 bosun is not affiliated with OpenSpec. It writes the OpenSpec 1.x file formats, checked against the 1.14.2 CLI and its source; if a later OpenSpec release changes them, `openspec validate` is the authority. [examples/openspec-todo-api](examples/openspec-todo-api) is a small complete example that passes both `spec-check` and `openspec validate --strict`.
 
 ## Terse output ("caveman" style)
@@ -262,7 +278,7 @@ Other built-in brakes: `ship`, `setup` and `archive` only run when you type them
 |---|---|---|
 | `commands.install/test/test_one/lint/typecheck/build/format/e2e` | exact commands; injected into every bosun agent at start | detected |
 | `planning.format` | `openspec` (OpenSpec change + board) or `plan` (PLAN.md + board) | openspec |
-| `planning.openspec_dir` | where the OpenSpec directory lives | openspec |
+| `planning.openspec_dir` | where bosun's OpenSpec directory lives; `.bosun/openspec` keeps it local and out of git, apart from a project's own `openspec/` (see [Next to your own OpenSpec](#next-to-your-own-openspec-kept-out-of-git)) | openspec |
 | `output_style` | `caveman`, `caveman-lite`, `caveman-ultra` or `normal` (see Terse output) | caveman |
 | `build.max_parallel` | agents in flight | 4 |
 | `build.isolation` | `worktree` or `shared` | worktree |

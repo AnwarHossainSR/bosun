@@ -16,7 +16,7 @@ Use it when the repository isn't a git repository, when the user prefers it, or 
 - Always pass `--strict-files` to `TB next`, so tasks without declared files run alone.
 - Implementers edit the main checkout and never stage or commit. The bosun guard hook enforces this for bosun agents.
 - Reviewers get `git diff -- <task files>` plus the task's untracked files (`git status --porcelain -- <paths>`).
-- When the gate passes and the fast checks are green, record the task first (`TB set <board> <ID> --status done --summary "..."`; for an OpenSpec plan this ticks tasks.md), then commit only that task's files plus tasks.md: `git add -- <files> [<tasks.md>]`, then `git commit -m "bosun(<ID>): <title>" -- <files> [<tasks.md>]`, then `TB set <board> <ID> --commit <sha>`.
+- When the gate passes and the fast checks are green, record the task first (`TB set <board> <ID> --status done --summary "..."`; for an OpenSpec plan this ticks tasks.md), then commit only that task's files plus tasks.md (leave tasks.md out when the OpenSpec directory is local, that is git-ignored): `git add -- <files> [<tasks.md>]`, then `git commit -m "bosun(<ID>): <title>" -- <files> [<tasks.md>]`, then `TB set <board> <ID> --commit <sha>`.
 - Tests run by one agent can see other agents' half-finished edits. Treat red results during a busy wave with suspicion: re-run the checks once the wave settles before failing a task.
 
 ## Review policies
@@ -47,7 +47,7 @@ Never resolve a conflict by throwing away one side wholesale without understandi
   - Check that it holds nothing else: every path in `git diff --cached --name-only` is in `git diff --name-only HEAD...<task_branch>`, and `git diff --name-only` (unstaged changes) lists nothing but conflicted paths. In both lists the plan's tasks.md is allowed too: `TB set --status done` ticks it in the working tree without staging it.
   - Conflicted paths (`git diff --name-only --diff-filter=U`) mean the session stopped while resolving a conflict. A half-done resolution can't be trusted, so propose undoing the merge.
   - No matching task, or other changes: show what you found and leave the merge to the user, and don't dispatch tasks until it's settled (skill, preflight step 4). Otherwise, after the go-ahead, either undo it with `git merge --abort` (`git reset --merge` after a squash) and set the task back to `review`, so it is gated and merged again from the start, or, if it has no conflicts, run the integration check again and commit it (after `TB set <board> <ID> --status done`, if it isn't done yet).
-- OpenSpec plans: `TB status <board>` reports tasks.md drift; `TB sync <board>` repairs it, then commit tasks.md.
+- OpenSpec plans: `TB status <board>` reports tasks.md drift; `TB sync <board>` repairs it, then commit tasks.md (not when the OpenSpec directory is local: git ignores it).
 - Recent agent activity: `TB activity <board> --tail 30`.
 
 ## Agent teams (optional)

@@ -257,6 +257,49 @@ class ExampleTests(unittest.TestCase):
         self.assert_error(errors, "it was archived to")
 
 
+def local_openspec_project(root: Path):
+    """The example with bosun's change in .bosun/openspec and a project-owned openspec/ beside it."""
+    shutil.copytree(EXAMPLE, root)
+    shutil.move(str(root / "openspec"), str(root / ".bosun" / "openspec"))
+    shutil.copytree(root / ".bosun" / "openspec", root / "openspec")
+    shutil.rmtree(root / "openspec" / "changes" / "add-todo-api")
+    shutil.copytree(EXAMPLE / CHANGE, root / "openspec" / "changes" / "their-change")
+    (root / ".bosun" / "config.json").write_text(json.dumps({"planning": {"openspec_dir": ".bosun/openspec"}}))
+
+
+def snapshot(directory: Path):
+    return {p.relative_to(directory).as_posix(): p.read_bytes() for p in sorted(directory.rglob("*")) if p.is_file()}
+
+
+class LocalOpenSpecDirTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "proj"
+        local_openspec_project(self.root)
+        self.board = self.root / BOARD
+        self.change = self.root / ".bosun" / "openspec" / "changes" / "add-todo-api"
+        self.theirs = snapshot(self.root / "openspec")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_tb(self, *args):
+        proc = subprocess.run([sys.executable, str(SCRIPT), *args], cwd=self.root,
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        return proc.stdout
+
+    def test_board_uses_the_configured_directory_and_leaves_the_projects_alone(self):
+        errors, warnings, report = tb.spec_check(json.loads(self.board.read_text()), self.board)
+        self.assertEqual((errors, warnings), ([], []))
+        self.assertEqual(Path(report["dir"]), self.change)
+        self.run_tb("set", str(self.board), "1.1", "--status", "done")
+        self.assertIn("- [x] 1.1 ", (self.change / "tasks.md").read_text())
+        self.assertIn(f"OpenSpec change (read-only for you): {self.change}/", self.run_tb("brief", str(self.board), "3.1"))
+        self.run_tb("sync", str(self.board))
+        self.assertEqual(snapshot(self.root / "openspec"), self.theirs)
+
+
 @unittest.skipUnless(shutil.which("openspec"), "OpenSpec CLI not installed")
 class OpenSpecCliTests(unittest.TestCase):
     def test_example_passes_openspec_validate(self):
@@ -264,6 +307,19 @@ class OpenSpecCliTests(unittest.TestCase):
         proc = subprocess.run(["openspec", "validate", "add-todo-api", "--strict", "--no-interactive"],
                               cwd=EXAMPLE, capture_output=True, text=True, timeout=120, env=env)
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_cli_uses_the_nearest_openspec_directory(self):
+        # bosun runs the CLI from the OpenSpec directory's parent; from the root it sees the project's own.
+        env = dict(os.environ, OPENSPEC_TELEMETRY="0")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            local_openspec_project(root)
+            def validate(cwd):
+                return subprocess.run(["openspec", "validate", "add-todo-api", "--strict", "--no-interactive"],
+                                      cwd=cwd, capture_output=True, text=True, timeout=120, env=env)
+            proc = validate(root / ".bosun")
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self.assertNotEqual(validate(root).returncode, 0)
 
 
 if __name__ == "__main__":

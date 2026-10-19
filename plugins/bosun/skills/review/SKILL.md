@@ -19,13 +19,13 @@ Show the `--stat`. If there's nothing to review, say so and stop.
 
 ## 2. Context
 
-Commit messages in the range; the PR or plan task this belongs to (its acceptance criteria, if it's a bosun task); the OpenSpec change it implements, if any (a bosun board with `meta.openspec_change`, or files under `openspec/changes/` in the diff); CLAUDE.md conventions; which checks the project has.
+Commit messages in the range; the PR or plan task this belongs to (its acceptance criteria, if it's a bosun task); the OpenSpec change it implements, if any (a bosun board with `meta.openspec_change`, or files under an OpenSpec `changes/` directory in the diff); CLAUDE.md conventions; which checks the project has.
 
 ## 3. Choose lenses and split the work
 
 Unless `--lenses` is given:
 - always `correctness`;
-- `spec` when the work implements an OpenSpec change: give the reviewer the change's requirement blocks (`openspec/changes/<id>/specs/`) and ask it to check every scenario against the code and tests;
+- `spec` when the work implements an OpenSpec change: give the reviewer the change's requirement blocks (`<openspec_dir>/changes/<id>/specs/`, where `<openspec_dir>` is `planning.openspec_dir` in `.bosun/config.json`, default `openspec`) and ask it to check every scenario against the code and tests;
 - `tests` when code changed;
 - `security` when the diff touches auth, sessions, crypto, input parsing, queries, file or network I/O, deserialization, permissions, secrets or config, dependencies, CI or infrastructure;
 - `design` for new modules, public APIs, or more than about 300 changed lines;

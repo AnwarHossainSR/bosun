@@ -23,14 +23,14 @@ Configure this repository for bosun. Change nothing before showing the user what
   - Go `go.mod`, Rust `Cargo.toml`, JVM `pom.xml` or `build.gradle(.kts)` and wrappers, Ruby `Gemfile`, PHP `composer.json`, .NET `*.sln`/`*.csproj`. Anything else: say so and ask.
   Record a command only if it really exists (the script, target or tool is there).
 - **Commit convention.** `git log --format=%s -30` plus any commitlint config: conventional, gitmoji, ticket-prefix, or freeform.
-- **OpenSpec.** Whether `openspec/` exists (config.yaml, specs/, changes/), `command -v openspec` and `openspec --version`. The CLI is optional for planning and building, and required for `/bosun:archive`. It sends anonymous usage statistics unless `OPENSPEC_TELEMETRY=0` (or `DO_NOT_TRACK=1`) is set; tell the user before they install it.
+- **OpenSpec.** Whether `openspec/` exists (config.yaml, specs/, changes/), whether git ignores it (`git check-ignore -q openspec/changes`), whether its changes belong to bosun (a `.bosun/plans/*/tasks.json` with that `meta.openspec_change`) or to the project itself, `command -v openspec` and `openspec --version`. The CLI is optional for planning and building, and required for `/bosun:archive`. It sends anonymous usage statistics unless `OPENSPEC_TELEMETRY=0` (or `DO_NOT_TRACK=1`) is set; tell the user before they install it.
 - **Protected paths to suggest.** CI workflows, applied migrations, generated or vendored code, secret files, release config.
 
 ## 2. Propose `.bosun/config.json`
 
 Start from `${CLAUDE_PLUGIN_ROOT}/templates/config.json`. Fill in exact command strings; `test_one` uses `{path}` for a single test file (for example `pnpm vitest run {path}`). Leave unknown commands as `""`. Defaults: `build.max_parallel` 4 (3 for heavy test suites or small machines), `isolation` `worktree` (`shared` outside git), `review` `task`, `security_review` `sensitive`, `max_attempts` 2, `merge` `merge`.
 
-- `planning.format`: `openspec` (default; plans are OpenSpec changes with requirements and scenarios) or `plan` (classic PLAN.md). `planning.openspec_dir`: `openspec` unless the repository keeps OpenSpec elsewhere.
+- `planning.format`: `openspec` (default; plans are OpenSpec changes with requirements and scenarios) or `plan` (classic PLAN.md). `planning.openspec_dir`: `openspec` unless the repository keeps OpenSpec elsewhere. If the project already uses OpenSpec for its own work (an `openspec/` whose changes no bosun board links), or the user wants bosun's specs kept out of git, recommend `.bosun/openspec`: bosun's changes then live in its own local folder, apart from the project's specs, are never committed, and still work with the OpenSpec CLI (bosun runs it from `.bosun/`). With that choice, also propose `openspec/**` in `protected_paths`, so bosun agents never edit the project's own specs.
 - `output_style`: `caveman` (default; terse agent reports and updates, so fewer output tokens), `caveman-lite`, `caveman-ultra`, or `normal`. It shortens prose only: code, commits, PR text, docs and specs are written normally. Savings depend on the work; don't promise a number.
 
 ## 3. Propose git hygiene
@@ -38,7 +38,7 @@ Start from `${CLAUDE_PLUGIN_ROOT}/templates/config.json`. Fill in exact command 
 `.bosun/` holds plans, reports, logs and scratch files; `.claude/worktrees/` holds agent worktrees. Neither should show up as untracked files. Offer one of:
 - (recommended) append both to `.git/info/exclude`: local only, nothing to commit;
 - add both to `.gitignore`: shared with the team.
-If the team wants plans in version control, they can ignore `.bosun/*` but keep `!.bosun/plans/`. Never ignore `openspec/`: the specs and archived changes are meant to be committed.
+If the team wants plans in version control, they can ignore `.bosun/*` but keep `!.bosun/plans/`. Don't ignore a shared `planning.openspec_dir` such as `openspec/`: its specs and archived changes are meant to be committed. A local one under `.bosun/` is ignored on purpose, and a project that ignores its own `openspec/` should use `.bosun/openspec` for bosun.
 
 ## 4. Worktree base (important)
 

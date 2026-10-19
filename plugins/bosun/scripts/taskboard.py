@@ -24,7 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 STATUSES = ("pending", "in_progress", "review", "done", "blocked", "failed", "skipped")
 FINISHED = frozenset({"done", "skipped"})
 INFLIGHT = frozenset({"in_progress", "review"})
@@ -50,7 +50,7 @@ bosun task board (tasks.json), schema v1. Annotated example; real files are plai
   "title": "Todo API with auth",         // optional human title
   "version": 1,
   "meta": {                              // optional; the build skill fills most of it
-    "openspec_change": "add-todo-api",   // OpenSpec plans: openspec/changes/<id>/ (see below)
+    "openspec_change": "add-todo-api",   // OpenSpec plans: <openspec_dir>/changes/<id>/ (see below)
     "base_branch": "main", "work_branch": "bosun/todo-api", "base_commit": "<sha>",
     "max_parallel": 4, "isolation": "worktree"
   },
@@ -86,9 +86,10 @@ notes, history, started_at, finished_at.
 Statuses: pending -> in_progress -> review -> done; also blocked, failed, skipped.
 A task is ready when it is pending and every dependency is done or skipped.
 
-OpenSpec plans (meta.openspec_change set): the change in openspec/changes/<id>/ is the spec:
-proposal.md (why), specs/<capability>/spec.md (delta requirements with scenarios), design.md
-(how) and tasks.md (checklist). Board ids are the tasks.md ids (1.1, 1.2, 2.1, ...), one
+OpenSpec plans (meta.openspec_change set): the change in <openspec_dir>/changes/<id>/ is the
+spec, where <openspec_dir> is planning.openspec_dir in .bosun/config.json (default openspec;
+.bosun/openspec keeps it local and out of git): proposal.md (why), specs/<capability>/spec.md
+(delta requirements with scenarios), design.md (how) and tasks.md (checklist). Board ids are the tasks.md ids (1.1, 1.2, 2.1, ...), one
 board task per tasks.md line. Each task lists the requirements it implements in spec_refs, and
 every ADDED or MODIFIED requirement needs at least one task. `spec-check` verifies all of this;
 `set --status done` ticks the task in tasks.md and `sync` repairs drift.
