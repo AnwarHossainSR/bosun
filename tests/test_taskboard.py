@@ -260,5 +260,11 @@ class ExampleBoardTests(unittest.TestCase):
         self.assertGreaterEqual(max(len(w) for w in waves), 4)
 
 
+class VersionTests(unittest.TestCase):
+    def test_cli_version_matches_the_plugin_manifest(self):
+        manifest = json.loads((ROOT / "plugins" / "bosun" / ".claude-plugin" / "plugin.json").read_text())
+        self.assertEqual(tb.VERSION, manifest["version"])
+
+
 if __name__ == "__main__":
     unittest.main()

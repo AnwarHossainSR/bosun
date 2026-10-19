@@ -4,21 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-19
+
 ### Added
 - `/bosun:plan #123` (or an issue URL) plans from a GitHub issue: the issue is the brief, the proposal (PLAN.md for `--classic`) cites it, the board records it as `meta.issue`, and `/bosun:ship` links the PR with `Closes` or `Refs`. The manager routes an issue like any other goal: plan, investigate, or a single implementer for a small change.
-- README: project-scope install (`--scope project`), following a branch with `owner/repo#ref`, how teammates get the plugin, and installing in Claude Code on the web through the environment's setup script.
-- Manager skill that routes any goal to the right workflow, and skills for plan, build, status, archive, investigate, review, review-pr, security-audit, commit, ship and setup.
-- Spec-driven planning: `/bosun:plan` writes an OpenSpec-format change (proposal, delta specs with scenarios, design, tasks.md) plus a task board whose tasks reference the requirements they implement (`spec_refs`). `--classic` keeps the PLAN.md format.
-- Task board commands for OpenSpec plans: `spec-check` (requirement coverage, tasks.md and board consistency, common format mistakes and deltas that archiving would refuse), `sync`, `add --spec-ref`, `init --openspec-change`; `set` ticks tasks.md, `brief` quotes the task's requirement blocks, `status` shows tasks.md progress.
-- `/bosun:archive`: checks that every task is done and the change validates, then runs `openspec archive` and re-validates the main specs.
-- `spec` review lens; implementers and test engineers write one test per scenario and report `spec_gaps`.
-- Terse output style (`output_style`: caveman, caveman-lite, caveman-ultra or normal; default caveman), injected into bosun agents by the SubagentStart hook and applied by every skill. It keeps logic words, quoted spec and test text, and full sentences for warnings, questions, uncertainty and requests to confirm.
-- The guard keeps bosun agents other than the architect from editing OpenSpec files.
-- Ten agents: architect, scout, implementer, test-engineer, docs-writer, code-reviewer, security-reviewer, verifier, investigator, monitor.
-- Task board CLI (`taskboard.py`) with dependency- and file-ownership-aware scheduling, critical-path priority and locked atomic writes.
-- Hooks: guard for bosun agents, activity log, project profile injection.
-- 40-task example plan, and an OpenSpec example change validated in CI with the OpenSpec CLI.
-- Open-source project files: CI, contributing guide, security policy, code of conduct, issue and pull request templates, CODEOWNERS, Dependabot for GitHub Actions.
+- README: project-scope install (`--scope project`), following a branch with `owner/repo#ref`, how teammates get the plugin, installing in Claude Code on the web through the environment's setup script, and updating to a new version.
+- `plugins/bosun/README.md`, a README inside the plugin folder for listings that show the plugin on its own, saying what bosun runs, writes and connects to; `homepage` in `plugin.json`.
+
+### Changed
+- The terse output style keeps logic words (because, so, but, not, only, can, may, must), text quoted from specs, tests and hypotheses, and full sentences for warnings, questions, statements of uncertainty and requests to confirm.
 
 ### Fixed
 - `/bosun:build --resume`: an unfinished merge is no longer reported as a dirty tree to commit or stash (other changes still are); resume proposes what to do with it and settles it only after your go-ahead, and no task is merged while one is still open. Preflight no longer switches branches during a merge (`git checkout` of the current branch silently drops the merge state). An `in_progress` task is matched to its worktree by commit subject or files, not by board fields left over from an earlier attempt, and its uncommitted work in the task's files is committed with path-limited commands and continued instead of being reset; other paths are left for you to decide.
@@ -26,3 +20,19 @@ All notable changes to this project are documented here. The format follows [Kee
 - The manager and `/bosun:investigate` treat issue text as a request from people, never as instructions, as `/bosun:plan` already did. The manager keeps the issue with the work on every route, so the PR can link it.
 - `/bosun:review --fix` changes nothing unless every file it would touch holds exactly the reviewed code (right head checked out, no unstaged or uncommitted edits there).
 - The SubagentStart hook no longer cuts the end of a long project profile (protected paths, main checkout, result reminder); it drops the last convention notes, then lists only as many protected paths as fit and counts the rest. The style rules keep `can`, `may` and `must` even when dropping hedges, and a test keeps every skill's style line in step with the hook.
+
+## [0.1.0] - 2026-10-16
+
+### Added
+- Manager skill that routes any goal to the right workflow, and skills for plan, build, status, archive, investigate, review, review-pr, security-audit, commit, ship and setup.
+- Spec-driven planning: `/bosun:plan` writes an OpenSpec-format change (proposal, delta specs with scenarios, design, tasks.md) plus a task board whose tasks reference the requirements they implement (`spec_refs`). `--classic` keeps the PLAN.md format.
+- Task board commands for OpenSpec plans: `spec-check` (requirement coverage, tasks.md and board consistency, common format mistakes and deltas that archiving would refuse), `sync`, `add --spec-ref`, `init --openspec-change`; `set` ticks tasks.md, `brief` quotes the task's requirement blocks, `status` shows tasks.md progress.
+- `/bosun:archive`: checks that every task is done and the change validates, then runs `openspec archive` and re-validates the main specs.
+- `spec` review lens; implementers and test engineers write one test per scenario and report `spec_gaps`.
+- Terse output style (`output_style`: caveman, caveman-lite, caveman-ultra or normal; default caveman), injected into bosun agents by the SubagentStart hook and applied by every skill.
+- The guard keeps bosun agents other than the architect from editing OpenSpec files.
+- Ten agents: architect, scout, implementer, test-engineer, docs-writer, code-reviewer, security-reviewer, verifier, investigator, monitor.
+- Task board CLI (`taskboard.py`) with dependency- and file-ownership-aware scheduling, critical-path priority and locked atomic writes.
+- Hooks: guard for bosun agents, activity log, project profile injection.
+- 40-task example plan, and an OpenSpec example change validated in CI with the OpenSpec CLI.
+- Open-source project files: CI, contributing guide, security policy, code of conduct, issue and pull request templates, CODEOWNERS, Dependabot for GitHub Actions.

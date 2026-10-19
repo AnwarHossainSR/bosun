@@ -76,6 +76,8 @@ claude --plugin-dir /path/to/bosun/plugins/bosun
 
 Check it loaded: `claude plugin details bosun` should list Skills (12), Agents (10), Hooks (3).
 
+**Update** with `claude plugin update bosun@bosun-marketplace` (add `--scope project` if you installed it that way), then start a new session or run `/reload-plugins`. A new version arrives only when `version` in `plugin.json` goes up, and auto-update is off by default for third-party marketplaces like this one. Release notes are in [CHANGELOG.md](CHANGELOG.md).
+
 ## First run in a project
 
 ```text
@@ -315,6 +317,7 @@ Known limitations:
 .claude-plugin/marketplace.json        marketplace (lists the plugin)
 plugins/bosun/
   .claude-plugin/plugin.json           plugin manifest
+  README.md                            short plugin README: what it runs, writes and connects to
   skills/<name>/SKILL.md               12 workflows (build/reference/execution.md holds edge cases)
   agents/<name>.md                     10 agents
   hooks/hooks.json + bosun_hooks.py    guard, activity log, context and output-style injection
