@@ -299,6 +299,18 @@ class LocalOpenSpecDirTests(unittest.TestCase):
         self.run_tb("sync", str(self.board))
         self.assertEqual(snapshot(self.root / "openspec"), self.theirs)
 
+    def test_only_the_config_names_the_directory(self):
+        # A board can't point the task board at another folder than the guard and the CLI calls use.
+        data = json.loads(self.board.read_text())
+        data["meta"]["openspec_dir"] = "openspec"
+        self.board.write_text(json.dumps(data))
+        status = json.loads(self.run_tb("status", str(self.board), "--json"))["openspec"]
+        self.assertEqual(Path(status["base"]).resolve(), (self.root / ".bosun" / "openspec").resolve())
+        self.assertEqual(Path(status["dir"]).resolve(), self.change.resolve())
+        self.run_tb("set", str(self.board), "1.2", "--status", "done")
+        self.assertIn("- [x] 1.2 ", (self.change / "tasks.md").read_text())
+        self.assertEqual(snapshot(self.root / "openspec"), self.theirs)
+
 
 @unittest.skipUnless(shutil.which("openspec"), "OpenSpec CLI not installed")
 class OpenSpecCliTests(unittest.TestCase):

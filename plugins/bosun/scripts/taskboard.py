@@ -903,7 +903,10 @@ def read_text(path: Path):
 
 
 def openspec_change(board, board_path: Path):
-    """Locate the OpenSpec change linked by meta.openspec_change, or None for a classic plan."""
+    """Locate the OpenSpec change linked by meta.openspec_change, or None for a classic plan.
+
+    The directory comes only from planning.openspec_dir in .bosun/config.json, the setting the skills,
+    the OpenSpec CLI calls and the guard also use, so they can't point at different folders."""
     meta = board.get("meta") or {}
     change_id = meta.get("openspec_change")
     if not change_id:
@@ -912,8 +915,7 @@ def openspec_change(board, board_path: Path):
         die(f"meta.openspec_change {change_id!r} is not a valid change id")
     root = bosun_dir_for(board_path).parent
     planning = read_config(board_path).get("planning")
-    base = Path(str(meta.get("openspec_dir") or (planning.get("openspec_dir") if isinstance(planning, dict) else None)
-                    or "openspec"))
+    base = Path(str((planning.get("openspec_dir") if isinstance(planning, dict) else None) or "openspec"))
     base = base if base.is_absolute() else root / base
     change_dir = base / "changes" / change_id
     archived = None
@@ -1562,7 +1564,7 @@ def cmd_status(args) -> int:
         md_path = info["tasks_md"] if live else (info["archived"] / "tasks.md" if info["archived"] else None)
         md = parse_tasks_md((read_text(md_path) if md_path else None) or "")
         ticked = {t["id"] for t in md if t["done"] and t["id"]}
-        spec = {"change": info["id"], "dir": str(info["dir"]), "exists": live,
+        spec = {"change": info["id"], "base": str(info["base"]), "dir": str(info["dir"]), "exists": live,
                 "archived": str(info["archived"]) if info["archived"] else None,
                 "tasks_md_total": len(md), "tasks_md_ticked": sum(1 for t in md if t["done"]),
                 "out_of_sync": sorted((k for k, t in idx.items() if live and status_of(t) != "skipped"

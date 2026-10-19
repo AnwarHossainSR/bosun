@@ -224,6 +224,7 @@ If the project already uses OpenSpec for its own work, or you don't want bosun's
 - Your own `openspec/` stays yours. `protected_paths` stops bosun agents from editing it (Edit and Write calls; the guard can't see inside shell commands), and the architect reads its specs only for context.
 - bosun runs the OpenSpec CLI from `.bosun/`, because the CLI uses the nearest `openspec/` folder; from the repository root it would act on your specs instead. This was checked with OpenSpec 1.14.2, and a test covers it when the CLI is installed.
 - Agents' worktrees don't get git-ignored files (unless a `.worktreeinclude` copies them in), so agents read the change from the main checkout, through the absolute paths and the quoted requirements in their task brief.
+- It's local only while git ignores it. `/bosun:setup` sets it only together with an ignore rule for `.bosun/`, and `/bosun:build` stops and asks if a `.bosun/` OpenSpec directory isn't ignored, rather than committing it. Check with `git check-ignore -v .bosun/openspec/changes`.
 
 bosun is not affiliated with OpenSpec. It writes the OpenSpec 1.x file formats, checked against the 1.14.2 CLI and its source; if a later OpenSpec release changes them, `openspec validate` is the authority. [examples/openspec-todo-api](examples/openspec-todo-api) is a small complete example that passes both `spec-check` and `openspec validate --strict`.
 
