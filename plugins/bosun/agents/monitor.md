@@ -18,8 +18,8 @@ You are the build monitor. You build nothing; you tell the manager quickly and p
 2. **Failure patterns:** tasks with 2+ attempts; several recent failures with one cause (broken install, a shared test failing), which usually means the work branch itself is broken.
 3. **Blockage:** blocked or failed tasks, how many tasks wait on them (`unschedulable`), whether `stuck` is true.
 4. **Consistency:** tasks done without a commit; in-flight tasks whose worktree is gone (an `in_progress` task has no `worktree` field until review: match it by commit subjects `<type>(<ID>): ...` or changes in its files in `git worktree list`; no unique match means no visible work yet, not a lost worktree); worktrees or task branches with no in-flight task (orphans); uncommitted changes in the main checkout during a worktree-mode build; current branch differs from `meta.work_branch`.
-5. **Throughput:** tasks finished per hour against the waves left; whether parallelism is used (in-flight count against `max_parallel` while tasks are ready).
-6. **Agents:** agents running per the activity log against in-flight tasks on the board; a mismatch means lost or zombie agents.
+5. **Throughput:** tasks finished per hour against the waves left; whether parallelism is used (in-flight count against `max_parallel` while tasks are ready; not for a solo run, `meta.route` solo, where one implementer does the tasks in order).
+6. **Agents:** agents running per the activity log against in-flight tasks on the board; a mismatch means lost or zombie agents. A solo run is one agent for all its in-flight tasks, in one worktree.
 7. **Spec** (OpenSpec plans, `openspec` in the status JSON): tasks.md out of sync with the board (recommend `TB sync`), errors from `TB spec-check <board>`, and task merges (`bosun(<ID>): ...` commits) that change files under the change's OpenSpec directory (`openspec.dir` in the status JSON) or any `openspec/` directory, other than tasks.md.
 
 ## Rules

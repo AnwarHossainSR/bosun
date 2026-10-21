@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-21
+
+### Added
+- Solo builds. `/bosun:build` now gives a small or medium plan to one implementer, which works through the tasks in tasks.md order in one worktree with a commit per task. The whole run then gets one review and one merge, and that review counts as the final review. "Small or medium" means up to 8 tasks and 16 size-units, all of them code tasks for the implementer, test-engineer or docs-writer. Bigger plans keep the parallel crew, and `--solo` or `--crew` picks the route yourself. A run that stops early continues from its commits, with the same agent when it can be resumed.
+- `TB route <board>` chooses between solo and crew. It gives the solo order (task ids wherever the deps allow it, so tasks.md order), the security-sensitive tasks and its reasons, and takes `--only` and `--json` like `next`. The build records the route on the board as `meta.route`.
+- Lean plans. `/bosun:plan` has the architect plan small and medium work alone: it reads the code the change touches and researches open questions itself, with no scouts and no critique round. Large or security-sensitive work, judged at intake and again from the finished board, still gets scouts, the architect's critique and a threat model. `--solo` or `--crew` picks the path yourself.
+
+### Changed
+- In a solo run, task briefs drop the "in flight right now" section (it would have listed the implementer's own later tasks as off-limits) and mark dependencies as done earlier in the run.
+- The implementer's result block lists each task of a solo run with its status, commit and summary. `TB status` and `/bosun:status` show the route, and the monitor counts a solo run as one agent.
+- The plan's approval summary shows the build route, with waves and the critical path only for a crew build.
+- The security reviewer runs secret scanners only in a mode that redacts what they find, as `/bosun:security-audit` already did.
+
+### Fixed
+- With agent teams enabled, the build leaves `name` off every agent it starts without `isolation` (shared-mode tasks as well as report tasks), so they all start as subagents.
+
 ## [0.4.0] - 2026-10-21
 
 ### Added

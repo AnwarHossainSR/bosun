@@ -189,6 +189,58 @@ class WavesTests(unittest.TestCase):
         self.assertEqual([len(w) for w in waves], [3, 3, 3, 1])
 
 
+class RouteTests(unittest.TestCase):
+    def test_small_writer_board_runs_solo_in_id_order(self):
+        # Id order (tasks.md order) wherever the deps allow it: 1.2 waits for 2.1, and 1.10 sorts after 1.9.
+        b = board(task("1.1"), task("1.2", ["2.1"]), task("2.1", ["1.1"]), task("1.9"), task("1.10"),
+                  task("3.1", agent="test-engineer"), task("3.2", agent="docs-writer"))
+        result = tb.plan_route(b)
+        self.assertEqual((result["route"], result["solo_ok"], result["large"]), ("solo", True, False))
+        self.assertEqual(result["order"], ["1.1", "1.9", "1.10", "2.1", "1.2", "3.1", "3.2"])
+        self.assertEqual((result["tasks"], result["size_units"], result["reasons"]), (7, 14, []))
+
+    def test_finished_tasks_drop_out(self):
+        b = board(task("A", status="done"), task("B", ["A"]), task("C", status="skipped"), task("D", ["C"]))
+        result = tb.plan_route(b)
+        self.assertEqual((result["route"], result["order"], result["tasks"]), ("solo", ["B", "D"], 2))
+        self.assertEqual(tb.plan_route(board(task("A", status="done")))["route"], "none")
+
+    def test_large_plans_keep_the_crew(self):
+        many = tb.plan_route(board(*[task(f"T{i}", size="S") for i in range(tb.SOLO_MAX_TASKS + 1)]))
+        self.assertEqual((many["route"], many["large"], many["solo_ok"]), ("crew", True, True))
+        self.assertIn("over the solo limit", many["reasons"][0])
+        heavy = tb.plan_route(board(*[task(f"T{i}", size="L") for i in range(6)]))  # 18 size-units
+        self.assertEqual((heavy["route"], heavy["large"], heavy["size_units"]), ("crew", True, 18))
+        at_limit = tb.plan_route(board(*[task(f"T{i}") for i in range(tb.SOLO_MAX_TASKS)]))  # 8 x M = 16
+        self.assertEqual(at_limit["route"], "solo")
+
+    def test_tasks_for_other_agents_need_the_crew(self):
+        for extra in ({"agent": "scout"}, {"agent": "my-team-agent"}, {"kind": "report"}):
+            result = tb.plan_route(board(task("A"), task("B", ["A"], **extra)))
+            self.assertEqual((result["route"], result["solo_ok"], result["large"]), ("crew", False, False), extra)
+            self.assertIn("needs its own agent: B", result["reasons"][0])
+
+    def test_waiting_stuck_and_only(self):
+        b = board(task("A", status="blocked"), task("B", ["A"]), task("C"), task("D", ["C"]))
+        result = tb.plan_route(b)
+        self.assertEqual((result["route"], result["order"], result["waiting"]), ("solo", ["C", "D"], ["B"]))
+        self.assertEqual(tb.plan_route(b, only=["B"])["route"], "stuck")
+        self.assertEqual(tb.plan_route(b, only=["D"])["waiting"], ["D"])  # its unlisted dependency C isn't done
+        self.assertEqual(tb.plan_route(b, only=["C", "D"])["order"], ["C", "D"])
+
+    def test_security_sensitive_tasks_are_listed(self):
+        b = board(task("A"), task("B", security_sensitive=True), task("C", ["B"], security_sensitive=True))
+        self.assertEqual(tb.plan_route(b)["security_sensitive"], ["B", "C"])
+
+    def test_example_boards(self):
+        todo = ROOT / "examples" / "openspec-todo-api" / ".bosun" / "plans" / "add-todo-api" / "tasks.json"
+        result = tb.plan_route(json.loads(todo.read_text()))
+        self.assertEqual(result["route"], "solo")
+        self.assertEqual(result["order"], ["1.1", "1.2", "2.1", "2.2", "2.3", "3.1", "3.2", "4.1"])
+        if EXAMPLE_40.is_file():
+            self.assertEqual(tb.plan_route(json.loads(EXAMPLE_40.read_text()))["route"], "crew")
+
+
 class CliTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -261,6 +313,27 @@ class CliTests(unittest.TestCase):
         for needle in ("# Task T03", "SECURITY-SENSITIVE", "## Acceptance criteria", "src/auth/",
                        "result: schema ok", "do not touch their files", "src/todos/"):
             self.assertIn(needle, brief)
+
+    def test_solo_briefs_have_no_other_writers(self):
+        # In a solo run every in-flight task is the same implementer's, done in order.
+        self.run_tb("set", "demo", "T01", "T02", "T03", "T04", "--status", "in_progress")
+        self.run_tb("meta", "demo", "--set", "route=solo")
+        brief = self.run_tb("brief", "demo", "T03").stdout
+        self.assertNotIn("In flight right now", brief)
+        self.assertIn("- T02 [earlier in this solo run]", brief)
+        self.assertIn("Route: solo", self.run_tb("status", "demo").stdout)
+        self.run_tb("meta", "demo", "--set", "route=crew")
+        self.assertIn("do not touch their files", self.run_tb("brief", "demo", "T03").stdout)
+
+    def test_route_cli(self):
+        result = json.loads(self.run_tb("route", "demo", "--json").stdout)
+        self.assertEqual((result["route"], result["order"]), ("solo", ["T01", "T02", "T03", "T04", "T05", "T06"]))
+        text = self.run_tb("route", "demo", "--only", "T01,T02").stdout
+        self.assertIn("route: solo (2 tasks", text)
+        self.assertIn("solo order: T01 T02", text)
+        proc = self.run_tb("route", "demo", "--only", "T01,NOPE", check=False)
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("NOPE", proc.stderr)
 
     def test_status_waves_graph_meta_activity(self):
         status = json.loads(self.run_tb("status", "demo", "--json").stdout)

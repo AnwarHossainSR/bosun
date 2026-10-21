@@ -2,19 +2,19 @@
 
 [![CI](https://github.com/AnwarHossainSR/bosun/actions/workflows/ci.yml/badge.svg)](https://github.com/AnwarHossainSR/bosun/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-On a ship, the bosun runs the deck crew. **bosun** runs a crew of Claude Code agents for you: give it a goal, and a manager picks the lightest workflow, then specialist agents plan, build, review and ship it in parallel, with a review gate on every change.
+On a ship, the bosun runs the deck crew. **bosun** runs a crew of Claude Code agents for you: give it a goal, and a manager picks the lightest workflow, then specialist agents plan, build, review and ship it, as many as the work needs, with a review gate before anything merges.
 
 <p align="center">
-  <img src="docs/bosun-flow.svg" width="100%" alt="How bosun works: your goal goes to the manager, which runs plan, build, review and ship with specialist agents working in parallel">
+  <img src="docs/bosun-flow.svg" width="100%" alt="How bosun works: your goal goes to the manager, which runs plan, build, review and ship with specialist agents sized to the work">
 </p>
 
 ## Why bosun
 
 - **One command for any goal.** `/bosun:manager <goal>` routes features, bugs, refactors, migrations, reviews and audits to the right workflow, and handles small changes without a crew.
 - **Spec-driven plans.** Plans are [OpenSpec](https://github.com/Fission-AI/OpenSpec) changes: requirements with testable scenarios, a design and a checklist. Every task traces back to the requirements it implements, and nothing is built until you approve.
-- **Parallel builds that stay safe.** A task board schedules work by dependencies and file ownership. Each implementer works in its own git worktree, and with the default review policy every task passes a code review (plus a security review when it matters) before it's merged.
+- **Right-sized builds that stay safe.** A small or medium plan goes to one implementer, task by task with a commit each, then one review and one merge. A big plan gets a parallel crew: a task board schedules work by dependencies and file ownership, each implementer works in its own git worktree, and with the default review policy every task passes a code review (plus a security review when it matters) before it's merged.
 - **Findings you can trust.** Reviewers look through different lenses in parallel, and a verifier re-checks every serious finding before you see it.
-- **Lean on tokens.** About 1.4k tokens of always-on context. Agents fetch their own briefs, results go to disk instead of the manager's context, and long logs are read from the tail.
+- **Lean on tokens.** About 1.4k tokens of always-on context. Small work skips the scouts, critique rounds and per-task reviews, agents fetch their own briefs, results go to disk instead of the manager's context, and long logs are read from the tail.
 - **Guard rails built in.** A hook stops bosun's agents from pushing, publishing, rewriting history or editing protected paths. Your own session is never touched.
 
 ## Quick start
@@ -31,7 +31,7 @@ Then, in Claude Code inside your project:
 ```text
 /bosun:setup                              one-time: detects your commands, writes .bosun/config.json
 /bosun:plan add CSV export to reports     spec and task board for your approval (or /bosun:plan #123)
-/bosun:build                              parallel agents build the approved plan
+/bosun:build                              builds it: one agent, or a parallel crew for a big plan
 /bosun:review                             multi-lens review of the branch
 /bosun:ship                               final checks, push and pull request (asks first)
 ```
@@ -55,8 +55,8 @@ Not sure which command fits? `/bosun:manager <goal in plain words>` picks one fo
 | Command | What it does |
 |---|---|
 | `/bosun:manager <goal>` | Routes any goal to the lightest workflow, from a single agent to a full crew. |
-| `/bosun:plan <idea \| #issue>` | Clarifying questions, parallel scouts, an OpenSpec change and task board, critique, your approval. `--classic` writes a PLAN.md instead. |
-| `/bosun:build [plan]` | Runs the board with parallel agents in worktrees, a review gate per task, merges and resume (`--resume`, `--parallel N`, `--dry-run`). |
+| `/bosun:plan <idea \| #issue>` | Clarifying questions, an OpenSpec change and task board, your approval. Large or security-sensitive work also gets scouts and a critique round (`--solo` or `--crew` to choose). `--classic` writes a PLAN.md instead. |
+| `/bosun:build [plan]` | Runs the board solo or with parallel agents in worktrees, review-gated merges and resume (`--solo`, `--crew`, `--resume`, `--parallel N`, `--dry-run`). |
 | `/bosun:status [--audit]` | Progress, work in flight, blocked tasks, what's next; `--audit` adds a health check. |
 | `/bosun:review [target]` | Parallel lens review of the branch, staged or working changes, a range or a commit; `--fix` applies confirmed fixes. |
 | `/bosun:review-pr <n \| url>` | The same panel on a GitHub PR, in a separate worktree; posts only text you approve. |
@@ -75,7 +75,7 @@ You can also call an agent directly: "use the bosun:security-reviewer agent on s
 |---|---|---|
 | `architect` | specs, plans, plan critique | plan and spec files |
 | `scout` | maps code, answers research spikes | nothing |
-| `implementer` | one task end to end: tests, code, checks, commit | code |
+| `implementer` | a task end to end, or a small plan's tasks in order: tests, code, checks, commit | code |
 | `test-engineer` | unit, integration and e2e tests, flakiness checks | tests |
 | `docs-writer` | docs that match the code | docs |
 | `code-reviewer` | diff review through one or more lenses | nothing |
@@ -88,11 +88,17 @@ Every agent ends with a short `# BOSUN-RESULT` block that the manager acts on.
 
 ## How a build runs
 
+The task board picks the route from the plan's size; `--solo` or `--crew` picks it yourself.
+
+**Solo**, for plans of up to 8 tasks and 16 size-units (S 1, M 2, L 3) whose tasks are all for the implementer, test-engineer or docs-writer. One implementer works through the tasks in tasks.md order, in one git worktree, with a commit per task and tests first. Then one review of the whole run (correctness, tests and spec, plus security when it matters), one `--no-ff` merge and the full checks. A run that stops early continues from its commits.
+
+**Crew**, for bigger plans:
+
 1. **Schedule.** The task board starts tasks whose dependencies are done and whose files don't overlap work in flight, critical path first, keeping up to `--parallel` agents busy (default 4).
 2. **Build.** Each implementer works in its own git worktree and reads its brief, which quotes the requirements it implements. Tests come first.
 3. **Gate.** With the default `build.review: task`, each task gets a code review (correctness, plus spec and tests where they apply) and a security review when it touches sensitive code, then a `--no-ff` merge with fast checks on the merged tree. The full suite runs every few merges; a merge that turns it red is reverted, never reset.
-4. **Resume.** The board lives on disk, so `/bosun:build --resume` continues after any interruption.
-5. **Finish.** Full checks, a final review of the whole range, docs and a `SUMMARY.md`. Pushing waits for `/bosun:ship`.
+
+Either way the board lives on disk, so `/bosun:build --resume` continues after any interruption. A build finishes with full checks, a final review of the whole range (a solo run's single review already was one), docs and a `SUMMARY.md`. Pushing waits for `/bosun:ship`.
 
 Worktree builds need `{ "worktree": { "baseRef": "head" } }` in `.claude/settings.local.json` so each worktree starts from the merged work; `/bosun:setup` offers to add it.
 
@@ -125,13 +131,14 @@ Already using OpenSpec for your own work? Give bosun its own git-ignored folder,
 ## Lean on tokens
 
 - **About 1.4k tokens per session** for the skill and agent listings (`claude plugin details bosun` shows the estimate). Turn bosun off in projects that don't use it with `/plugin`.
+- **Right-sized plans and builds.** Small and medium work runs like OpenSpec's own propose-and-apply flow: one architect writes the plan and one implementer builds it. Scouts and a critique round join only for large or security-sensitive work, and a solo build has one review instead of one per task.
 - **Agents fetch their own brief** with the task board, so the manager doesn't retype it into every prompt.
 - **Results go to disk.** A hook saves each agent's report next to its plan (`.bosun/plans/<name>/results/`, or `.bosun/results/` outside a plan); the manager reads the short result block and points later agents to the file.
 - **Quiet logs.** Long test, build and scanner output goes to a log, and agents read the last 40 lines unless something failed.
 - **Right-sized reviews.** A small diff gets one reviewer covering all its lenses, a large one a reviewer per lens.
 - **Terse prose.** Agent reports use a short "caveman" style. Code, commands, paths and quoted specs stay exact, and commits, PRs and docs stay normal prose. Set `output_style` to `normal` to turn it off.
 
-A multi-agent build still does much more work than a single session. Start with a small plan to see the flow; lower `build.max_parallel`, use `build.review: batch`, or run implementers on `sonnet` to spend less.
+A crew build still does much more work than a single session. Start with a small plan to see the flow; to spend less on a big one, try `--solo` when the board allows it, lower `build.max_parallel`, use `build.review: batch`, or run implementers on `sonnet`.
 
 ## Configuration
 

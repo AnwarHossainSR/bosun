@@ -314,6 +314,18 @@ class EventTests(unittest.TestCase):
         entry = json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
         self.assertEqual((entry["task"], entry["status"], entry["summary"]), ("T07", "done", "Added rotation"))
 
+    def test_solo_run_result_keeps_the_run_level_fields(self):
+        # One block covers a solo run; the per-task entries are indented and must not override the run's fields.
+        message = ("Stopped early.\n\n```yaml\n# BOSUN-RESULT\nagent: implementer\ntask: 1.1,1.2,2.1\n"
+                   "status: partial   # solo: done when all are\nsummary: two of three\ncommit: b2\ntasks:\n"
+                   "  - id: 1.1\n    status: done\n    commit: a1\n  - id: 1.2\n    status: done\n    commit: b2\n"
+                   "  - id: 2.1\n    status: not-started\n    commit: none\n```\n")
+        proc = self.run_hook(self.base("SubagentStop", last_assistant_message=message, stop_hook_active=False))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        entry = self.last_entry()
+        self.assertEqual((entry["task"], entry["status"], entry["commit"]), ("1.1,1.2,2.1", "partial", "b2"))
+        self.assertRegex(Path(entry["saved"]).name, r"^\d{8}T\d{6}Z-implementer-1\.1-1\.2-2\.1-a1\.md$")
+
     def last_entry(self):
         return json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
 

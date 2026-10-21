@@ -1,6 +1,6 @@
 # bosun
 
-Your AI dev crew for Claude Code. A manager skill takes a goal and picks the lightest workflow: a spec-first plan (an OpenSpec-format change with testable scenarios) built by parallel agents in git worktrees, an investigation, a multi-lens review, a security audit, or a single agent for a small change. Ten specialist agents do the work, a task board schedules them by dependencies and file ownership, and every task is reviewed before it's merged.
+Your AI dev crew for Claude Code. A manager skill takes a goal and picks the lightest workflow: a spec-first plan (an OpenSpec-format change with testable scenarios) built by one implementer task by task or, for a big plan, by parallel agents in git worktrees; an investigation, a multi-lens review, a security audit, or a single agent for a small change. Ten specialist agents do the work, a task board schedules them by dependencies and file ownership, and all work is reviewed before it's merged.
 
 Full documentation: <https://github.com/AnwarHossainSR/bosun#readme>
 

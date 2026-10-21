@@ -24,7 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 STATUSES = ("pending", "in_progress", "review", "done", "blocked", "failed", "skipped")
 FINISHED = frozenset({"done", "skipped"})
 INFLIGHT = frozenset({"in_progress", "review"})
@@ -37,6 +37,11 @@ REPORT_AGENTS = frozenset(
     {"architect", "scout", "code-reviewer", "security-reviewer", "verifier", "investigator", "monitor"}
 )
 SIZE_WEIGHT = {"S": 1, "M": 2, "L": 3}
+# A solo build runs the tasks one after another in one implementer's session, so it stays small enough for
+# one context; bigger plans keep the parallel crew. Test and docs tasks fit an implementer, other agents don't.
+SOLO_MAX_TASKS = 8
+SOLO_MAX_UNITS = 16
+SOLO_AGENTS = frozenset({"implementer", "test-engineer", "docs-writer"})
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 GLOB_CHARS = "*?["
@@ -52,7 +57,8 @@ bosun task board (tasks.json), schema v1. Annotated example; real files are plai
   "meta": {                              // optional; the build skill fills most of it
     "openspec_change": "add-todo-api",   // OpenSpec plans: <openspec_dir>/changes/<id>/ (see below)
     "base_branch": "main", "work_branch": "bosun/todo-api", "base_commit": "<sha>",
-    "max_parallel": 4, "isolation": "worktree"
+    "max_parallel": 4, "isolation": "worktree",
+    "route": "solo"                      // solo: one implementer, tasks in order | crew: parallel (`route`)
   },
   "tasks": [
     {
@@ -1243,6 +1249,56 @@ def simulate_waves(board, parallel: int, strict_files: bool = False):
     return waves, sorted(todo, key=natural_key), critical
 
 
+def plan_route(board, only=None):
+    """Solo (one implementer runs the tasks in order) or crew (parallel agents) for the tasks left. The order
+    follows the task ids (tasks.md order) wherever the deps allow it; tasks behind blocked, failed or unlisted
+    unfinished ones can't run and are listed as waiting."""
+    idx = index_tasks(board)
+    wanted = set(only or ()) or None
+    todo = {k: t for k, t in idx.items()
+            if status_of(t) not in FINISHED | STOPPED and (wanted is None or k in wanted)}
+    done = {k for k, t in idx.items() if status_of(t) in FINISHED}
+    order, left = [], dict(todo)
+    while True:
+        ready = [k for k, t in left.items() if all(d in done for d in deps_of(t))]
+        if not ready:
+            break
+        key = min(ready, key=natural_key)
+        order.append(key)
+        done.add(key)
+        del left[key]
+    units = sum(size_weight(t) for t in todo.values())
+    large = len(todo) > SOLO_MAX_TASKS or units > SOLO_MAX_UNITS
+    others = [k for k in sorted(todo, key=natural_key)
+              if agent_short(agent_of(todo[k])) not in SOLO_AGENTS or kind_of(todo[k]) != "code"]
+    reasons = []
+    if large:
+        reasons.append(f"{len(todo)} tasks and {units} size-units, over the solo limit of "
+                       f"{SOLO_MAX_TASKS} tasks and {SOLO_MAX_UNITS} size-units")
+    if others:
+        reasons.append("needs its own agent: " + ", ".join(
+            f"{k} ({agent_full(agent_of(todo[k]))}{', report' if kind_of(todo[k]) == 'report' else ''})"
+            for k in others))
+    if not todo:
+        route = "none"
+    elif not order:
+        route = "stuck"  # every task left waits on a blocked, failed or unlisted one
+    else:
+        route = "crew" if large or others else "solo"
+    return {
+        "route": route,
+        "solo_ok": bool(order) and not others,  # --solo can run them (a large plan may need a continuation)
+        "large": large,
+        "tasks": len(todo),
+        "size_units": units,
+        "order": order,
+        "waiting": sorted(left, key=natural_key),
+        "security_sensitive": [k for k in sorted(todo, key=natural_key) if todo[k].get("security_sensitive")],
+        "reasons": reasons,
+        "limits": {"tasks": SOLO_MAX_TASKS, "size_units": SOLO_MAX_UNITS},
+    }
+
+
 # ----------------------------------------------------------------------------- commands
 
 def cmd_latest(args) -> int:
@@ -1298,10 +1354,8 @@ def cmd_next(args) -> int:
     board = load_board(path)
     require_valid(board, path)
     parallel = args.parallel or default_parallel(board, path)
-    only = [i.strip() for i in (args.only or "").split(",") if i.strip()]
-    unknown = sorted(set(only) - set(index_tasks(board)), key=natural_key)
-    if unknown:
-        print(f"error: --only names unknown task id(s): {', '.join(unknown)}", file=sys.stderr)
+    only = parse_only(board, args.only)
+    if only is None:
         return 2
     result = plan_next(board, parallel, args.strict_files, only)
     if args.json:
@@ -1328,6 +1382,45 @@ def cmd_next(args) -> int:
         print(f"blocked/failed: {', '.join(result['stopped'])}")
     if result["stuck"]:
         print("STUCK: pending tasks remain but none can start; unblock or skip the blocked/failed tasks")
+    return 0
+
+
+def parse_only(board, value):
+    """The ids of --only, or None (with the error printed) when one isn't on the board."""
+    only = [i.strip() for i in (value or "").split(",") if i.strip()]
+    unknown = sorted(set(only) - set(index_tasks(board)), key=natural_key)
+    if unknown:
+        print(f"error: --only names unknown task id(s): {', '.join(unknown)}", file=sys.stderr)
+        return None
+    return only
+
+
+def cmd_route(args) -> int:
+    path = resolve_board(args.board)
+    board = load_board(path)
+    require_valid(board, path)
+    only = parse_only(board, args.only)
+    if only is None:
+        return 2
+    result = plan_route(board, only)
+    if args.json:
+        emit_json(result)
+        return 0
+    if result["route"] == "none":
+        print("route: none (nothing left to run)")
+    elif result["route"] == "stuck":
+        print("route: stuck (every task left waits on a blocked, failed or unlisted task)")
+    else:
+        why = "; ".join(result["reasons"]) or (
+            f"{result['tasks']} tasks, {result['size_units']} size-units; solo up to "
+            f"{SOLO_MAX_TASKS} tasks and {SOLO_MAX_UNITS} size-units")
+        print(f"route: {result['route']} ({why})")
+    if result["solo_ok"]:
+        print(f"solo order: {' '.join(result['order'])}")
+    if result["security_sensitive"]:
+        print(f"security-sensitive: {', '.join(result['security_sensitive'])}")
+    if result["waiting"]:
+        print(f"waiting (behind blocked, failed or unlisted tasks): {', '.join(result['waiting'])}")
     return 0
 
 
@@ -1481,6 +1574,8 @@ def cmd_brief(args) -> int:
     else:
         lines.append("- (not declared; keep the change as small as possible and list every file you touch)")
     lines.append("")
+    # A solo run's in-flight tasks are all the same implementer's, done in order: no one else is editing.
+    solo = (board.get("meta") or {}).get("route") == "solo"
     deps = [idx[d] for d in deps_of(task) if d in idx]
     if deps:
         lines += ["## Completed dependencies (build on these; don't redo them)", ""]
@@ -1489,11 +1584,13 @@ def cmd_brief(args) -> int:
                 f"commit {dep['commit']}" if dep.get("commit") else "",
                 f"files: {', '.join(files_of(dep))}" if files_of(dep) else "",
             ) if x)
-            lines.append(f"- {dep['id']} [{status_of(dep)}] {dep.get('title', '')}" + (f" ({extra})" if extra else ""))
+            state = "earlier in this solo run" if solo and status_of(dep) in INFLIGHT else status_of(dep)
+            lines.append(f"- {dep['id']} [{state}] {dep.get('title', '')}" + (f" ({extra})" if extra else ""))
             if dep.get("summary"):
                 lines.append(f"  - result: {dep['summary']}")
         lines.append("")
-    others = [t for t in idx.values() if status_of(t) in INFLIGHT and t["id"] != task["id"] and files_of(t)]
+    others = [] if solo else [t for t in idx.values()
+                              if status_of(t) in INFLIGHT and t["id"] != task["id"] and files_of(t)]
     if others:
         lines += ["## In flight right now (do not touch their files)", ""]
         lines += [f"- {t['id']} {t.get('title', '')}: {', '.join(files_of(t))}" for t in others]
@@ -1599,6 +1696,9 @@ def cmd_status(args) -> int:
     if meta.get("work_branch"):
         print(f"Branch: {meta.get('work_branch')} (base {meta.get('base_branch', '?')}"
               + (f" @ {str(meta['base_commit'])[:10]}" if meta.get("base_commit") else "") + ")")
+    if meta.get("route") in ("solo", "crew"):
+        print("Route: " + ("solo (one implementer runs the tasks in order)" if meta["route"] == "solo"
+                           else "crew (parallel agents)"))
     if spec:
         state = "" if spec["exists"] else (f" (archived: {spec['archived']})" if spec["archived"]
                                             else " (change directory missing)")
@@ -1795,6 +1895,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--parallel", type=int, help="max tasks in flight (default: meta.max_parallel, config, or 4)")
     p.add_argument("--strict-files", action="store_true", help="code tasks with no declared files run alone")
     p.add_argument("--only", help="comma-separated task ids: start only these (unlisted tasks never take a slot)")
+    p.add_argument("--json", action="store_true")
+
+    p = board_cmd("route", f"solo (one implementer runs the tasks in order; up to {SOLO_MAX_TASKS} tasks and "
+                  f"{SOLO_MAX_UNITS} size-units, all code tasks for implementer, test-engineer or docs-writer) "
+                  "or crew (parallel agents) for the tasks left, with the solo order", cmd_route)
+    p.add_argument("--only", help="comma-separated task ids: route only these")
     p.add_argument("--json", action="store_true")
 
     p = board_cmd("set", "update one or more tasks (status, assignee, branch, worktree, commit, summary, note)", cmd_set)
