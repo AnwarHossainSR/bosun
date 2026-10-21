@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" role="img" aria-labelledby="title desc">
+  <title id="title">How bosun works</title>
+  <desc id="desc">You give the bosun manager a goal. It picks the lightest workflow and runs specialist agents in parallel: plan (scouts, architect, threat model, your approval), build (implementers in their own git worktrees, review gates, merge), review (lens reviewers and a verifier) and ship (final checks and a pull request). Investigation, security audit, PR review, status and commits are also available.</desc>
+  <style>
+    .bg { fill: #ffffff; stroke: #d0d7de; }
+    .card { fill: #f6f8fa; stroke: #d0d7de; }
+    .chip { fill: #ffffff; stroke: #d0d7de; }
+    .band { fill: #f6f8fa; }
+    .t { fill: #1f2328; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }
+    .m { fill: #59636e; }
+    .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+    .ln { stroke: #8c959f; fill: none; stroke-width: 1.5; }
+    .chev { stroke: #8c959f; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    .ah { fill: #8c959f; }
+    .plan { fill: #6639ba; } .plan-s { stroke: #6639ba; } .plan-bg { fill: #fbefff; }
+    .build { fill: #0969da; } .build-s { stroke: #0969da; } .build-bg { fill: #ddf4ff; }
+    .review { fill: #9a6700; } .review-s { stroke: #9a6700; } .review-bg { fill: #fff8c5; }
+    .ship { fill: #1a7f37; } .ship-s { stroke: #1a7f37; } .ship-bg { fill: #dafbe1; }
+    .stack { fill: #ffffff; stroke-opacity: 0.45; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; stroke: #30363d; }
+      .card { fill: #151b23; stroke: #30363d; }
+      .chip { fill: #0d1117; stroke: #3d444d; }
+      .band { fill: #151b23; }
+      .t { fill: #e6edf3; }
+      .m { fill: #9198a1; }
+      .ln, .chev { stroke: #6e7681; }
+      .ah { fill: #6e7681; }
+      .plan { fill: #ab7df8; } .plan-s { stroke: #ab7df8; } .plan-bg { fill: #2e1f52; }
+      .build { fill: #4493f8; } .build-s { stroke: #4493f8; } .build-bg { fill: #0c2d57; }
+      .review { fill: #d29922; } .review-s { stroke: #d29922; } .review-bg { fill: #3b2e0a; }
+      .ship { fill: #3fb950; } .ship-s { stroke: #3fb950; } .ship-bg { fill: #10331c; }
+      .stack { fill: #0d1117; }
+    }
+  </style>
+
+  <rect class="bg" x="0.5" y="0.5" width="1199" height="559" rx="16"/>
+
+  <!-- goal -> manager -->
+  <rect class="card" x="40" y="28" width="300" height="60" rx="12"/>
+  <text class="t m" x="60" y="51" font-size="11" font-weight="600" letter-spacing="1.2">YOUR GOAL</text>
+  <text class="t mono" x="60" y="74" font-size="13">/bosun:manager "add CSV export"</text>
+  <line class="ln" x1="342" y1="58" x2="408" y2="58"/>
+  <path class="ah" d="M 418 58 L 407 52.5 L 407 63.5 Z"/>
+
+  <rect class="card" x="420" y="24" width="360" height="68" rx="14"/>
+  <text class="t" x="444" y="53" font-size="17" font-weight="700">Manager</text>
+  <text class="t m" x="444" y="76" font-size="12.5">picks the lightest workflow for the goal</text>
+
+  <text class="t m" x="812" y="50" font-size="12.5">or call any stage directly:</text>
+  <text class="t mono" x="812" y="71" font-size="12.5">/bosun:plan</text>
+  <text class="t mono" x="926" y="71" font-size="12.5">/bosun:build</text>
+  <text class="t mono" x="812" y="90" font-size="12.5">/bosun:review</text>
+  <text class="t mono" x="926" y="90" font-size="12.5">/bosun:ship</text>
+
+  <!-- routing bus -->
+  <path class="ln" d="M 600 92 V 116 M 171 116 H 1029 M 171 116 V 132 M 457 116 V 132 M 743 116 V 132 M 1029 116 V 132"/>
+  <path class="ah" d="M 171 141 L 165.5 131 L 176.5 131 Z"/>
+  <path class="ah" d="M 457 141 L 451.5 131 L 462.5 131 Z"/>
+  <path class="ah" d="M 743 141 L 737.5 131 L 748.5 131 Z"/>
+  <path class="ah" d="M 1029 141 L 1023.5 131 L 1034.5 131 Z"/>
+
+  <!-- 1 plan -->
+  <rect class="card" x="40" y="142" width="262" height="258" rx="14"/>
+  <circle class="plan-bg plan-s" cx="70" cy="172" r="15" stroke-width="1.5"/>
+  <text class="t plan" x="70" y="177" font-size="14" font-weight="700" text-anchor="middle">1</text>
+  <text class="t plan" x="94" y="177" font-size="14" font-weight="700" letter-spacing="1.4">PLAN</text>
+  <text class="t m" x="58" y="207" font-size="12.5">spec first, from an idea or an issue</text>
+  <rect class="stack plan-s" x="64" y="214" width="226" height="30" rx="8"/>
+  <rect class="stack plan-s" x="61" y="218" width="226" height="30" rx="8"/>
+  <rect class="chip" x="58" y="222" width="226" height="30" rx="8"/>
+  <text class="t" x="72" y="242" font-size="12.5">scouts map the code</text>
+  <text class="t plan" x="272" y="242" font-size="11.5" font-weight="700" text-anchor="end">×3</text>
+  <rect class="chip" x="58" y="260" width="226" height="30" rx="8"/>
+  <text class="t" x="72" y="280" font-size="12.5">architect writes the spec</text>
+  <rect class="chip" x="58" y="298" width="226" height="30" rx="8"/>
+  <text class="t" x="72" y="318" font-size="12.5">critique + threat model</text>
+  <line class="ln" x1="58" y1="344" x2="284" y2="344" stroke-opacity="0.5"/>
+  <text class="t" x="58" y="367" font-size="13" font-weight="600">OpenSpec change + task board</text>
+  <text class="t m" x="58" y="387" font-size="12">nothing is built until you approve</text>
+
+  <path class="chev" d="M 309 262 L 318 271 L 309 280"/>
+
+  <!-- 2 build -->
+  <rect class="card" x="326" y="142" width="262" height="258" rx="14"/>
+  <circle class="build-bg build-s" cx="356" cy="172" r="15" stroke-width="1.5"/>
+  <text class="t build" x="356" y="177" font-size="14" font-weight="700" text-anchor="middle">2</text>
+  <text class="t build" x="380" y="177" font-size="14" font-weight="700" letter-spacing="1.4">BUILD</text>
+  <text class="t m" x="344" y="207" font-size="12.5">many agents, one git worktree each</text>
+  <rect class="stack build-s" x="350" y="214" width="226" height="30" rx="8"/>
+  <rect class="stack build-s" x="347" y="218" width="226" height="30" rx="8"/>
+  <rect class="chip" x="344" y="222" width="226" height="30" rx="8"/>
+  <text class="t" x="358" y="242" font-size="12.5">implementers, tests first</text>
+  <text class="t build" x="558" y="242" font-size="11.5" font-weight="700" text-anchor="end">×N</text>
+  <rect class="chip" x="344" y="260" width="226" height="30" rx="8"/>
+  <text class="t" x="358" y="280" font-size="12.5">code + security review gate</text>
+  <rect class="chip" x="344" y="298" width="226" height="30" rx="8"/>
+  <text class="t" x="358" y="318" font-size="12.5">verifier double-checks</text>
+  <line class="ln" x1="344" y1="344" x2="570" y2="344" stroke-opacity="0.5"/>
+  <text class="t" x="344" y="367" font-size="13" font-weight="600">merged task by task</text>
+  <text class="t m" x="344" y="387" font-size="12">tasks.md ticked, resumable any time</text>
+
+  <path class="chev" d="M 595 262 L 604 271 L 595 280"/>
+
+  <!-- 3 review -->
+  <rect class="card" x="612" y="142" width="262" height="258" rx="14"/>
+  <circle class="review-bg review-s" cx="642" cy="172" r="15" stroke-width="1.5"/>
+  <text class="t review" x="642" y="177" font-size="14" font-weight="700" text-anchor="middle">3</text>
+  <text class="t review" x="666" y="177" font-size="14" font-weight="700" letter-spacing="1.4">REVIEW</text>
+  <text class="t m" x="630" y="207" font-size="12.5">many lenses, findings verified</text>
+  <rect class="stack review-s" x="636" y="214" width="226" height="30" rx="8"/>
+  <rect class="stack review-s" x="633" y="218" width="226" height="30" rx="8"/>
+  <rect class="chip" x="630" y="222" width="226" height="30" rx="8"/>
+  <text class="t" x="644" y="242" font-size="12.5">lens reviewers</text>
+  <text class="t review" x="844" y="242" font-size="11.5" font-weight="700" text-anchor="end">×N</text>
+  <rect class="chip" x="630" y="260" width="226" height="30" rx="8"/>
+  <text class="t" x="644" y="280" font-size="12.5">verifier drops false alarms</text>
+  <rect class="chip" x="630" y="298" width="226" height="30" rx="8"/>
+  <text class="t" x="644" y="318" font-size="12.5">--fix applies confirmed fixes</text>
+  <line class="ln" x1="630" y1="344" x2="856" y2="344" stroke-opacity="0.5"/>
+  <text class="t" x="630" y="367" font-size="13" font-weight="600">one ranked report</text>
+  <text class="t m" x="630" y="387" font-size="12">severity, evidence and a fix for each</text>
+
+  <path class="chev" d="M 881 262 L 890 271 L 881 280"/>
+
+  <!-- 4 ship -->
+  <rect class="card" x="898" y="142" width="262" height="258" rx="14"/>
+  <circle class="ship-bg ship-s" cx="928" cy="172" r="15" stroke-width="1.5"/>
+  <text class="t ship" x="928" y="177" font-size="14" font-weight="700" text-anchor="middle">4</text>
+  <text class="t ship" x="952" y="177" font-size="14" font-weight="700" letter-spacing="1.4">SHIP</text>
+  <text class="t m" x="916" y="207" font-size="12.5">final gate, then a pull request</text>
+  <rect class="chip" x="916" y="222" width="226" height="30" rx="8"/>
+  <text class="t" x="930" y="242" font-size="12.5">lint · types · tests · build</text>
+  <rect class="chip" x="916" y="260" width="226" height="30" rx="8"/>
+  <text class="t" x="930" y="280" font-size="12.5">quick review of the branch</text>
+  <rect class="chip" x="916" y="298" width="226" height="30" rx="8"/>
+  <text class="t" x="930" y="318" font-size="12.5">PR from your template</text>
+  <line class="ln" x1="916" y1="344" x2="1142" y2="344" stroke-opacity="0.5"/>
+  <text class="t" x="916" y="367" font-size="13" font-weight="600">ready for your team</text>
+  <text class="t m" x="916" y="387" font-size="12">pushes only after you confirm</text>
+
+  <!-- more workflows -->
+  <text class="t m" x="40" y="446" font-size="12.5" font-weight="600">Also:</text>
+  <rect class="chip" x="86" y="424" width="276" height="32" rx="16"/>
+  <text class="t" x="104" y="445" font-size="12.5">investigate a bug, hypotheses in parallel</text>
+  <rect class="chip" x="374" y="424" width="122" height="32" rx="16"/>
+  <text class="t" x="392" y="445" font-size="12.5">security audit</text>
+  <rect class="chip" x="508" y="424" width="150" height="32" rx="16"/>
+  <text class="t" x="526" y="445" font-size="12.5">review a GitHub PR</text>
+  <rect class="chip" x="670" y="424" width="170" height="32" rx="16"/>
+  <text class="t" x="688" y="445" font-size="12.5">status + health audit</text>
+  <rect class="chip" x="852" y="424" width="196" height="32" rx="16"/>
+  <text class="t" x="870" y="445" font-size="12.5">commits in your convention</text>
+
+  <!-- under the hood -->
+  <rect class="band" x="40" y="476" width="1120" height="56" rx="12"/>
+  <circle class="plan" cx="66" cy="504" r="4"/>
+  <text class="t" x="80" y="508.5" font-size="12.5">Dependency-aware task board</text>
+  <circle class="build" cx="346" cy="504" r="4"/>
+  <text class="t" x="360" y="508.5" font-size="12.5">Guard hook for bosun's agents</text>
+  <circle class="review" cx="626" cy="504" r="4"/>
+  <text class="t" x="640" y="508.5" font-size="12.5">Results on disk, not in your context</text>
+  <circle class="ship" cx="906" cy="504" r="4"/>
+  <text class="t" x="920" y="508.5" font-size="12.5">Lean prompts, terse output</text>
+</svg>

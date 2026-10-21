@@ -106,6 +106,25 @@ class OtherRuleTests(unittest.TestCase):
         self.assertTrue(denied("git push 'unterminated"))
         self.assertFalse(denied("echo 'unterminated"))
 
+    def test_board_writes_are_found_and_reads_are_not(self):
+        tb = 'python3 "/home/u/.claude/plugins/cache/m/bosun/0.4.0/scripts/taskboard.py"'
+        for cmd, sub in ((f"{tb} set /r/.bosun/plans/x/tasks.json 1.1 --status done", "set"),
+                         (f"{tb} add b.json --id 9.1 --title x", "add"), (f"{tb} sync b.json", "sync"),
+                         (f"{tb} init x --title y", "init"), (f"{tb} meta b.json --set work_branch=x", "meta"),
+                         (f'bash -c "{tb} set b.json 1.1 --status done"', "set"),
+                         (f"cd /r && {tb} set b.json 1.1 --status done", "set"),
+                         ('python "C:\\Users\\me\\.claude\\plugins\\bosun\\scripts\\taskboard.py" set b.json 1', "set"),
+                         (f"env X=1 {tb} set b.json 1 --status done", "set")):
+            self.assertEqual(hooks.board_write(cmd), sub, cmd)
+        # Unparseable commands (an unbalanced quote) still get the conservative scan.
+        self.assertEqual(hooks.board_write(f'{tb} meta b.json --set work_branch=x "oops'), "meta")
+        self.assertEqual(hooks.board_write(f'{tb} set b.json 1.1 "oops'), "set")
+        self.assertIsNone(hooks.board_write(f'{tb} meta b.json "oops'))
+        for cmd in (f"{tb} brief /r/.bosun/plans/x/tasks.json 2.1", f"{tb} status b.json --json",
+                    f"{tb} next b.json --parallel 3 --json", f"{tb} meta b.json", f"{tb} spec-check b.json",
+                    "cat taskboard.py", "grep set taskboard.py", "pytest tests/test_set.py"):
+            self.assertIsNone(hooks.board_write(cmd), cmd)
+
 
 class PathRuleTests(unittest.TestCase):
     def setUp(self):
@@ -219,6 +238,7 @@ class EventTests(unittest.TestCase):
         self.assertEqual(out["hookEventName"], "SubagentStart")
         self.assertIn("test: pnpm test", out["additionalContext"])
         self.assertIn("Output style: caveman", out["additionalContext"])
+        self.assertIn('code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)', out["additionalContext"])
         self.assertNotIn("profile cut to fit", out["additionalContext"])
         log = (self.root / ".bosun" / "activity.jsonl").read_text().splitlines()
         self.assertEqual(json.loads(log[-1])["event"], "start")
@@ -294,6 +314,114 @@ class EventTests(unittest.TestCase):
         entry = json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
         self.assertEqual((entry["task"], entry["status"], entry["summary"]), ("T07", "done", "Added rotation"))
 
+    def last_entry(self):
+        return json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
+
+    def saved_rel(self, entry):
+        return Path(entry["saved"]).resolve().relative_to(self.root.resolve()).as_posix()
+
+    def test_stop_saves_the_final_message(self):
+        message = "Done.\n\n```yaml\n# BOSUN-RESULT\nagent: implementer\ntask: 2.1\nstatus: done\nsummary: ok\n```\n"
+        proc = self.run_hook(self.base("SubagentStop", last_assistant_message=message, stop_hook_active=False))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        entry = self.last_entry()
+        saved = Path(entry["saved"])
+        self.assertTrue(saved.is_absolute(), entry["saved"])  # worktree agents can't resolve a relative one
+        self.assertEqual(saved.read_text(), message)
+        self.assertRegex(saved.name, r"^\d{8}T\d{6}Z-implementer-2\.1-a1\.md$")
+        self.assertEqual(self.saved_rel(entry), ".bosun/results/" + saved.name)
+
+    def test_saved_message_keeps_the_end_and_odd_names_are_safe(self):
+        message = "x" * (hooks.MAX_SAVED_CHARS + 10) + "\n# BOSUN-RESULT\ntask: ../../etc/passwd\nstatus: done\n"
+        self.run_hook(self.base("SubagentStop", agent="bosun:code-reviewer", last_assistant_message=message))
+        entry = self.last_entry()
+        saved = Path(entry["saved"])
+        self.assertTrue(self.saved_rel(entry).startswith(".bosun/results/"), entry["saved"])
+        self.assertIn("-code-reviewer-etc-passwd-", saved.name)
+        cut = len(message) - hooks.MAX_SAVED_CHARS
+        self.assertEqual(saved.read_text(), f"[bosun: first {cut} characters cut]\n" + message[-hooks.MAX_SAVED_CHARS:])
+
+    def test_results_go_to_the_plan_named_in_the_block(self):
+        plan = self.root / ".bosun" / "plans" / "add-x"
+        plan.mkdir(parents=True)
+        (plan / "tasks.json").write_text("{}")
+        message = f"# BOSUN-RESULT\ntask: 1.1\nboard: {plan / 'tasks.json'}\nstatus: done\n"
+        self.run_hook(self.base("SubagentStop", last_assistant_message=message))
+        self.assertTrue(self.saved_rel(self.last_entry()).startswith(".bosun/plans/add-x/results/"))
+        self.assertEqual(Path(self.last_entry()["saved"]).read_text(), message)
+        for board in ("/etc/tasks.json", str(self.root / ".bosun" / "plans" / "missing" / "tasks.json"),
+                      str(plan / ".." / ".." / "tasks.json"), ".bosun/plans/add-x/../../../x/tasks.json", "none"):
+            message = f"# BOSUN-RESULT\ntask: 1.1\nboard: {board}\nstatus: done\n"
+            self.run_hook(self.base("SubagentStop", last_assistant_message=message))
+            self.assertTrue(self.saved_rel(self.last_entry()).startswith(".bosun/results/"), board)
+
+    def test_same_second_stops_never_overwrite(self):
+        data = {"agent_type": "bosun:code-reviewer", "cwd": str(self.root)}
+        with mock.patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(self.root)}), \
+                mock.patch.object(hooks.time, "strftime", return_value="20261021T000000Z"):
+            paths = [hooks.save_result(data, f"report {i}", {"task": "2.1"}) for i in range(3)]
+        self.assertEqual([Path(p).read_text() for p in paths], ["report 0", "report 1", "report 2"])
+        self.assertEqual([Path(p).name for p in paths], ["20261021T000000Z-code-reviewer-2.1.md",
+                                                       "20261021T000000Z-code-reviewer-2.1-2.md",
+                                                       "20261021T000000Z-code-reviewer-2.1-3.md"])
+
+    def test_broken_unicode_still_logs_the_stop(self):
+        message = "bad \ud83d\n# BOSUN-RESULT\ntask: 2.1\nstatus: done\nsummary: ok \ud83d\n"
+        proc = self.run_hook(self.base("SubagentStop", last_assistant_message=message))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        entry = self.last_entry()
+        self.assertEqual((entry["event"], entry["task"], entry["status"]), ("stop", "2.1", "done"))
+        self.assertIn("# BOSUN-RESULT", Path(entry["saved"]).read_text())
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "needs symlinks")
+    def test_results_never_follow_a_link_out_of_the_project(self):
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        os.symlink(outside.name, self.root / ".bosun" / "results")
+        proc = self.run_hook(self.base("SubagentStop", last_assistant_message="# BOSUN-RESULT\ntask: 2.1\nstatus: done\n"))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(os.listdir(outside.name), [])
+        entry = self.last_entry()
+        self.assertEqual(entry["event"], "stop")
+        self.assertNotIn("saved", entry)
+
+    def test_handed_back_report_is_saved_once_and_its_stop_is_not_flagged(self):
+        # Newer Claude Code delivers a subagent's report through the SubagentHandback tool, so the last message
+        # at SubagentStop holds only closing text.
+        report = "# BOSUN-RESULT\nagent: scout\ntask: recon-auth\nstatus: done\nsummary: mapped\n"
+        handback = self.base("PostToolUse", agent="bosun:scout", tool_name="SubagentHandback",
+                             tool_input={"message": report})
+        self.assertEqual(self.run_hook(handback).returncode, 0)
+        entry = self.last_entry()
+        self.assertEqual((entry["event"], entry["task"], entry["via"]), ("stop", "recon-auth", "handback"))
+        self.assertEqual(Path(entry["saved"]).read_text(), report)
+        log = self.root / ".bosun" / "activity.jsonl"
+        lines = len(log.read_text().splitlines())
+        stop = self.base("SubagentStop", agent="bosun:scout", last_assistant_message="Handed back.",
+                         stop_hook_active=False)
+        self.assertEqual(self.run_hook(stop, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 0)
+        self.assertEqual(len(log.read_text().splitlines()), lines)
+        self.assertEqual(self.run_hook(stop, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 2)  # no handback this time
+
+    def test_stale_handback_marker_does_not_hide_a_later_stop(self):
+        marker = self.root / ".bosun" / "handbacks" / "a1"
+        marker.parent.mkdir(parents=True)
+        marker.write_text(str(1_000_000_000))  # 2001: its stop never came
+        stop = self.base("SubagentStop", last_assistant_message="no block", stop_hook_active=False)
+        self.assertEqual(self.run_hook(stop, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 2)
+        self.assertEqual(self.last_entry()["status"], "no-result-block")
+        self.assertFalse(marker.exists())
+
+    def test_only_the_architect_may_write_the_board(self):
+        cmd = "python3 /p/scripts/taskboard.py set /r/.bosun/plans/x/tasks.json 1.1 --status done"
+        payload = self.base("PreToolUse", tool_name="Bash", tool_input={"command": cmd})
+        proc = self.run_hook(payload)
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("only writer", proc.stderr)
+        self.assertEqual(self.run_hook(dict(payload, agent_type="bosun:architect")).returncode, 0)
+        payload["tool_input"] = {"command": "python3 /p/scripts/taskboard.py brief /r/.bosun/plans/x/tasks.json 1.1"}
+        self.assertEqual(self.run_hook(payload).returncode, 0)
+
     def test_missing_result_is_logged_and_optionally_enforced(self):
         payload = self.base("SubagentStop", last_assistant_message="done!", stop_hook_active=False)
         self.assertEqual(self.run_hook(payload).returncode, 0)
@@ -328,6 +456,11 @@ class EventTests(unittest.TestCase):
                                   text=True, env=dict(env, CLAUDE_PROJECT_DIR=other.name, BOSUN_OUTPUT_STYLE="normal"),
                                   timeout=30)
             self.assertEqual((proc.returncode, proc.stdout), (0, ""))
+            stop = dict(payload, hook_event_name="SubagentStop", last_assistant_message="# BOSUN-RESULT\nstatus: done\n")
+            proc = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(stop), capture_output=True,
+                                  text=True, env=dict(env, CLAUDE_PROJECT_DIR=other.name), timeout=30)
+            self.assertEqual(proc.returncode, 0)
+            self.assertFalse((Path(other.name) / ".bosun").exists())
         finally:
             other.cleanup()
 
@@ -336,10 +469,23 @@ class EventTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
 
 
+class FrontmatterTests(unittest.TestCase):
+    def test_descriptions_are_plain_yaml_scalars(self):
+        # ": " or " #" in an unquoted value breaks strict YAML parsers (Claude Code copes, other tools don't).
+        plugin = ROOT / "plugins" / "bosun"
+        files = sorted(plugin.glob("skills/*/SKILL.md")) + sorted(plugin.glob("agents/*.md"))
+        self.assertTrue(files)
+        for path in files:
+            line = next(l for l in path.read_text().splitlines() if l.startswith("description: "))
+            value = line[len("description: "):]
+            self.assertNotIn(": ", value, path)
+            self.assertNotIn(" #", value, path)
+
+
 class SkillStyleTests(unittest.TestCase):
     def test_every_skill_restates_the_hook_style_rules(self):
         # Skills run in the main session, which the hook never reaches, so each SKILL.md repeats the rules.
-        rule = next(r for r in hooks.STYLE_RULES if r.startswith("Keep the words that carry logic"))
+        rule = next(r for r in hooks.STYLE_RULES if r.startswith("Keep logic words"))
         words = rule.split(":", 1)[1].strip().rstrip(".")
         skills = sorted((ROOT / "plugins" / "bosun" / "skills").glob("*/SKILL.md"))
         self.assertTrue(skills)

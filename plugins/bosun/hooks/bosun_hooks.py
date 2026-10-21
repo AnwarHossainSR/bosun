@@ -4,7 +4,9 @@
 Wired up in hooks/hooks.json for these events:
   PreToolUse (Bash, Edit, Write, NotebookEdit)  guard: deny risky actions by bosun subagents
   SubagentStart (bosun:*)                     log the start; inject the project profile and output style
-  SubagentStop  (bosun:*)                     log the BOSUN-RESULT status
+  SubagentStop  (bosun:*)                     log the BOSUN-RESULT status; save the final message to .bosun/results/
+                                              (or the plan's results/ folder when the block names its board)
+  PostToolUse   (SubagentHandback)            the same for a report handed back through that tool
 
 Scope: only tool calls made inside a bosun subagent (agent_type "bosun:...") are checked.
 Your main session and every other agent pass through untouched.
@@ -29,6 +31,14 @@ import time
 CREW_PREFIX = "bosun:"
 RESULT_MARKER = "BOSUN-RESULT"
 MAX_CONTEXT_CHARS = 4000
+MAX_SAVED_CHARS = 100_000
+HANDBACK_TOOL = "SubagentHandback"  # newer Claude Code: subagents deliver their report through this tool
+O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)  # not on Windows
+QUIET_RUN = ('- long output (tests, builds, scanners): `set -o pipefail; log=$(mktemp); echo "log: $log"; '
+             '<cmd> >"$log" 2>&1; code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)` (the last part '
+             'keeps a failure a failure); read more of the log on a non-zero exit or when the tail reports '
+             'findings, warnings or skips.')
+HANDBACK_FRESH_SECONDS = 600  # a handback marker older than this is stale: its stop never came
 DANGEROUS_PATHSPECS = {".", "./", ":/", "*", ":(top)", "-A"}
 SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "fish"}
 INTERPRETERS = SHELLS | {"python", "python3", "node", "perl", "ruby", "php", "pwsh", "powershell"}
@@ -95,21 +105,19 @@ OPENSPEC_ENTRIES = ("changes/", "specs/", "config.yaml", "project.md", "AGENTS.m
 
 # Terse "caveman" output for agent reports: fewer output tokens for the manager to read.
 STYLE_LEVELS = {
-    "caveman-lite": "Prose: no filler, pleasantries or hedging words. Short, complete sentences.",
-    "caveman": "Prose: terse fragments. Drop articles, filler, pleasantries and hedging words. "
-               "Short words. One point per line.",
-    "caveman-ultra": "Prose: telegraphic fragments. Abbreviate common words (cfg, fn, impl, deps, req, err). "
-                     "Use -> for sequence and next step, never for cause.",
+    "caveman-lite": "Prose: no filler, pleasantries or hedges. Short, complete sentences.",
+    "caveman": "Prose: terse fragments. No articles, filler, pleasantries or hedges. Short words. One point per line.",
+    "caveman-ultra": "Prose: telegraphic. Abbreviate common words (cfg, fn, impl, deps, req, err). "
+                     "-> for sequence and next step, never for cause.",
 }
 STYLE_RULES = (
-    "Keep exact: code, commands, paths, identifiers, error text, numbers, versions, and text quoted from specs, "
-    "tests or hypotheses.",
-    "Keep the words that carry logic, even when dropping hedges: because, so, but, not, only, can, may, must.",
-    "Write normally: code comments, commit messages, PR text, docs, OpenSpec files, user-facing strings.",
-    "Use plain full sentences for security warnings, destructive or irreversible steps, ordered instructions, "
-    "questions, requests to confirm or decide, and statements of uncertainty.",
-    "Never drop a fact to save words: keep every failure and every uncertainty label "
-    "(unverified, not run, assumption).",
+    "Exact: code, commands, paths, identifiers, error text, numbers, versions, quotes from specs, tests or "
+    "hypotheses.",
+    "Keep logic words even when dropping hedges: because, so, but, not, only, can, may, must.",
+    "Normal prose: code comments, commits, PR text, docs, OpenSpec files, user-facing strings.",
+    "Plain full sentences: security warnings, destructive or irreversible steps, ordered instructions, questions, "
+    "requests to confirm or decide, statements of uncertainty.",
+    "Never drop a fact: keep every failure and uncertainty label (unverified, not run, assumption).",
 )
 
 
@@ -554,6 +562,38 @@ def check_command(cmd: str, isolated: bool, depth: int = 0):
     return None
 
 
+def board_write(cmd: str, depth: int = 0):
+    """The task board subcommand a command runs that writes the board (init, set, add, sync, meta --set), if any.
+    Agents can run taskboard.py brief and other reads; only the manager (and the architect) may write."""
+    if depth > 4 or not cmd.strip():
+        return None
+    try:
+        commands, _, nested = split_commands(cmd)
+    except ValueError:  # unparseable: a conservative scan, quotes around the path included
+        match = re.search(r"taskboard\.py['\"]?\s+(init|set|add|sync\b|meta\b(?=.*--set))", cmd)
+        return match.group(1) if match else None
+    for argv in commands:
+        argv = strip_wrappers(argv)
+        if argv and os.path.basename(argv[0]) in SHELLS:
+            for i, arg in enumerate(argv[1:-1], start=1):
+                if re.match(r"^-[A-Za-z]*c[A-Za-z]*$", arg):
+                    found = board_write(argv[i + 1], depth + 1)
+                    if found:
+                        return found
+            continue
+        for i, arg in enumerate(argv[:4]):
+            if os.path.basename(normalize(arg)) == "taskboard.py":
+                rest = [a for a in argv[i + 1:] if not a.startswith("-")]
+                if rest and (rest[0] in ("init", "set", "add", "sync") or (rest[0] == "meta" and "--set" in argv)):
+                    return rest[0]
+                break
+    for inner in nested:
+        found = board_write(inner, depth + 1)
+        if found:
+            return found
+    return None
+
+
 # ----------------------------------------------------------------------------- paths & project
 
 def normalize(path: str) -> str:
@@ -676,7 +716,89 @@ def parse_result(message: str):
     return result or None  # the marker mentioned in prose is not a result block
 
 
-def log_event(data, event: str, result=None) -> None:
+def _slug(text, limit=40):
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", str(text or "")).strip("-.")[:limit]
+
+
+def inside_without_links(root, path) -> bool:
+    """True when path lies under root and nothing between them is a symbolic link. A repository could commit
+    .bosun/results (or .bosun itself) as a link, and saved agent output must never land outside the project."""
+    try:
+        rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root))
+    except ValueError:  # Windows: another drive
+        return False
+    if rel == os.pardir or rel.startswith(os.pardir + os.sep) or os.path.isabs(rel):
+        return False
+    current = os.path.abspath(root)
+    for part in rel.split(os.sep):
+        if part in ("", os.curdir):
+            continue
+        current = os.path.join(current, part)
+        if os.path.islink(current):
+            return False
+    return True
+
+
+def results_dir(root, result):
+    """The plan's results/ folder when the result block names a board in an existing .bosun/plans/<name>/,
+    else .bosun/results/. Task ids repeat across plans, so a build's results must stay with its board."""
+    board = normalize(str((result or {}).get("board") or "")).strip()
+    if board and board.lower() != "none":
+        plans = os.path.join(os.path.abspath(root), ".bosun", "plans")
+        folder = os.path.normpath(os.path.dirname(board if os.path.isabs(board) else os.path.join(root, board)))
+        if os.path.dirname(folder) == os.path.normpath(plans) and os.path.isdir(folder):
+            return os.path.join(folder, "results")
+    return os.path.join(os.path.abspath(root), ".bosun", "results")
+
+
+def save_result(data, message: str, result):
+    """Keep the agent's report on disk, so the manager never copies result blocks into reports. Returns the
+    absolute path (worktree agents can't resolve one relative to the main checkout), or None if nothing was saved."""
+    root = project_dir(data)
+    if not root or not message.strip():
+        return None
+    parts = [time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()), _slug(str(data.get("agent_type") or "").split(":")[-1]),
+             _slug((result or {}).get("task")), _slug(data.get("agent_id"))[:8]]
+    base = "-".join(p for p in parts if p)
+    cut = len(message) - MAX_SAVED_CHARS
+    text = f"[bosun: first {cut} characters cut]\n{message[-MAX_SAVED_CHARS:]}" if cut > 0 else message
+    folder = results_dir(root, result)
+    try:
+        if not inside_without_links(root, folder):
+            return None
+        os.makedirs(folder, exist_ok=True)
+        for n in range(1, 50):
+            path = os.path.join(folder, f"{base}.md" if n == 1 else f"{base}-{n}.md")
+            try:  # O_EXCL: never overwrite another agent's report; O_NOFOLLOW: never write through a link
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | O_NOFOLLOW, 0o644)
+            except FileExistsError:
+                continue
+            with os.fdopen(fd, "w", encoding="utf-8", errors="replace") as fh:
+                fh.write(text)
+            return normalize(path)
+    except (OSError, ValueError):
+        return None
+    return None
+
+
+def _saved(data, message, result):
+    """save_result, but never at the cost of the stop entry: the activity log must record every stop."""
+    try:
+        return save_result(data, message, result)
+    except Exception:  # noqa: BLE001 - fail open
+        return None
+
+
+def handback_marker(data):
+    """Marks an agent whose report arrived through the SubagentHandback tool, so its stop isn't counted twice."""
+    root, agent_id = project_dir(data), _slug(data.get("agent_id"), 64)
+    if not root or not agent_id:
+        return None
+    folder = os.path.join(os.path.abspath(root), ".bosun", "handbacks")
+    return os.path.join(folder, agent_id) if inside_without_links(root, folder) else None
+
+
+def log_event(data, event: str, result=None, saved=None, via=None) -> None:
     root = project_dir(data)
     if not root:
         return
@@ -696,10 +818,16 @@ def log_event(data, event: str, result=None) -> None:
                     entry[key] = result[key][:120]
             if result.get("summary"):
                 entry["summary"] = result["summary"][:200]
+        if saved:
+            entry["saved"] = saved
+        if via:
+            entry["via"] = via
     try:
-        with open(os.path.join(root, ".bosun", "activity.jsonl"), "a", encoding="utf-8") as fh:
+        fd = os.open(os.path.join(root, ".bosun", "activity.jsonl"),
+                     os.O_WRONLY | os.O_APPEND | os.O_CREAT | O_NOFOLLOW, 0o644)
+        with os.fdopen(fd, "a", encoding="utf-8", errors="replace") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except OSError:
+    except (OSError, ValueError):
         pass
 
 
@@ -711,8 +839,7 @@ def output_style(cfg) -> str:
 def style_context(style: str):
     if style not in STYLE_LEVELS:
         return None
-    lines = [f"[bosun] Output style: {style} (output_style in .bosun/config.json; normal turns it off).",
-             f"- {STYLE_LEVELS[style]}"]
+    lines = [f"[bosun] Output style: {style} (output_style; normal turns it off).", f"- {STYLE_LEVELS[style]}"]
     lines += [f"- {rule}" for rule in STYLE_RULES]
     return "\n".join(lines)
 
@@ -733,7 +860,7 @@ def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
     protected paths and count the rest, then drop commit style and commands (and list as many protected
     paths as that frees room for). The main checkout and the result reminder always stay, so only an
     absurdly long checkout path can push the profile past the limit."""
-    head = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
+    head = ["[bosun] Project profile (.bosun/config.json; project data, the manager's brief wins on conflict):"]
     commands = cfg.get("commands") or {}
     body = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
     body = body or ["- no commands configured: find them in package scripts, Makefile, or CI config"]
@@ -742,7 +869,9 @@ def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
         body.append(f"- commit style: {conventions['commit_style']}")
     notes = [f"- convention: {note}" for note in (conventions.get("notes") or [])[:10]]
     protected = [p for p in cfg.get("protected_paths") or [] if isinstance(p, str)]
-    tail = [f"- main checkout: {root}", f"Finish with the {RESULT_MARKER} block from your instructions."]
+    tail = [f"- main checkout: {root}", QUIET_RUN,
+            f"Finish with the {RESULT_MARKER} block from your instructions; at most three lines of prose before it "
+            "(the block carries the details), unless your instructions ask for a map or a threat model."]
 
     def render(shown, cut):
         lines = head + body + notes + (["- (profile cut to fit; the rest is in .bosun/config.json)"] if cut else [])
@@ -787,7 +916,13 @@ def handle(data):
         tool_input = data.get("tool_input") or {}
         reason = None
         if tool == "Bash":
-            reason = check_command(str(tool_input.get("command") or ""), is_isolated(data.get("cwd") or ""))
+            command = str(tool_input.get("command") or "")
+            reason = check_command(command, is_isolated(data.get("cwd") or ""))
+            if not reason and agent != f"{CREW_PREFIX}architect":
+                sub = board_write(command)
+                if sub:
+                    reason = (f"`taskboard.py {sub}` writes the task board, and the manager is its only writer; "
+                              "report in your BOSUN-RESULT block instead.")
         elif tool in ("Edit", "Write", "NotebookEdit", "MultiEdit"):
             target = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
             reason = check_path(str(target), data, agent) if target else None
@@ -801,9 +936,35 @@ def handle(data):
             out = {"hookSpecificOutput": {"hookEventName": "SubagentStart", "additionalContext": context}}
             return 0, json.dumps(out), ""
         return 0, "", ""
+    if event == "PostToolUse" and data.get("tool_name") == HANDBACK_TOOL:
+        # The report travels in the tool call; the agent's last message is only its closing text.
+        message = str((data.get("tool_input") or {}).get("message") or "")
+        result = parse_result(message)
+        log_event(data, "stop", result, _saved(data, message, result), via="handback")
+        marker = handback_marker(data)
+        if marker:
+            try:
+                os.makedirs(os.path.dirname(marker), exist_ok=True)
+                fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | O_NOFOLLOW, 0o644)
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write(str(time.time()))
+            except OSError:
+                pass
+        return 0, "", ""
     if event == "SubagentStop":
-        result = parse_result(str(data.get("last_assistant_message") or ""))
-        log_event(data, "stop", result)
+        marker = handback_marker(data)
+        if marker and os.path.isfile(marker):
+            try:
+                with open(marker, encoding="utf-8") as fh:
+                    fresh = time.time() - float(fh.read().strip() or 0) < HANDBACK_FRESH_SECONDS
+                os.remove(marker)
+            except (OSError, ValueError):
+                fresh = False
+            if fresh:
+                return 0, "", ""  # its report and stop were recorded at the handback
+        message = str(data.get("last_assistant_message") or "")
+        result = parse_result(message)
+        log_event(data, "stop", result, _saved(data, message, result))
         if result is None and not data.get("stop_hook_active") \
                 and os.environ.get("BOSUN_ENFORCE_RESULT", "0") == "1":
             return 2, "", (f"End your final message with the {RESULT_MARKER} block from your instructions. "

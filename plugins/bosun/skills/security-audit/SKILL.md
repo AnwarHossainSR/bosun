@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: Security review with parallel security agents - of the current branch's changes (default) or the whole codebase (--full). Maps the attack surface, runs scanners that are already installed, splits the review by area (auth, input handling, data and secrets, dependencies and infrastructure), verifies every serious finding, and writes a report with fixes. Use before shipping security-sensitive changes or for periodic audits.
+description: Security review of this branch's changes, or the whole codebase with --full, by parallel security agents, with verified findings and fixes. Use before shipping sensitive changes.
 argument-hint: "[--full | <base>...<head>] [--areas auth,input,data,deps-infra] [--fix]"
 ---
 
@@ -8,37 +8,37 @@ argument-hint: "[--full | <base>...<head>] [--areas auth,input,data,deps-infra] 
 
 Scope: $ARGUMENTS
 
-**Style:** follow `output_style` in `.bosun/config.json` (default `caveman`): your own prose and agent prompts are terse fragments without filler; code, commands, paths, errors, numbers and quoted text stay exact; keep logic words (because, so, but, not, only, can, may, must); warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty get full sentences; never drop a fact or an uncertainty label. Commits, PR text, docs and specs stay normal prose. `normal` turns this off.
+**Style:** `output_style` in `.bosun/config.json` (default `caveman`): your prose and agent prompts terse, no filler; code, commands, paths, errors, numbers and quotes exact; keep logic words (because, so, but, not, only, can, may, must); full sentences for warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty; never drop a fact or an uncertainty label. Commits, PR text, docs and specs: normal prose. `normal` turns it off.
 
 ## 1. Scope
 
-- **Default (diff)**: the same target as the `bosun:review` skill (this branch against its base, plus uncommitted work).
-- **`--full`**: the whole codebase. First build an attack-surface map, yourself for a small repository or with a `bosun:scout` for a large one: entry points (HTTP routes, RPC, CLI, queues, webhooks, uploads), authentication and authorization layers, data stores, outbound calls, secrets and config handling, dependency manifests, CI and infrastructure files.
+- **Default (diff)**: the `bosun:review` skill's default target (this branch against its base, plus uncommitted work).
+- **`--full`**: the whole codebase. First an attack-surface map, yourself for a small repository or with a `bosun:scout` for a large one: entry points (HTTP routes, RPC, CLI, queues, webhooks, uploads), authentication and authorization layers, data stores, outbound calls, secrets and config handling, dependency manifests, CI and infrastructure files.
 
 ## 2. Scanners (optional)
 
-Check which tools are installed (`command -v gitleaks trufflehog semgrep osv-scanner pip-audit govulncheck cargo-audit trivy`, plus the package manager's audit command). Run the relevant ones and keep their output as leads for the reviewers. Don't install anything without asking. Note which tools weren't available.
+Check what's installed (`command -v gitleaks trufflehog semgrep osv-scanner pip-audit govulncheck cargo-audit trivy`, plus the package manager's audit command). Run the relevant ones, each into its own log (`set -o pipefail; log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)`); when the tail doesn't show the findings, grep or read more of that log. Secret scanners print the secrets they find: run one only in a mode that redacts them (gitleaks: `--redact`), and skip one that can't, noting it as unsafe to run here; for those, show only the exit status and finding count instead of the tail. Delete every scanner log once the report is written. Keep the output as leads for the reviewers. Install nothing without asking. Note which tools weren't available.
 
 ## 3. Review in parallel
 
-Split into areas, adjusted to the codebase (skip empty ones):
+Areas, adjusted to the codebase (skip empty ones):
 - **auth**: authentication, sessions, tokens, password and reset flows, authorization checks, tenant isolation;
 - **input**: validation, injection (SQL, command, template), XSS and output encoding, SSRF, path traversal, uploads, deserialization;
 - **data**: secrets and config, cryptography, PII and logging, error messages, security headers, CORS and CSRF;
 - **deps-infra**: dependencies and supply chain, CI workflows, containers and infrastructure as code.
 
-With `--areas`, review only the areas listed (comma-separated names from the list above, such as `--areas auth,input`); tell the user if a listed name doesn't match one of them. Without it, review every area that applies.
+`--areas` reviews only the listed areas (comma-separated names from the list, such as `--areas auth,input`); tell the user if a name doesn't match one. Without it, every area that applies.
 
-In one message, spawn one `bosun:security-reviewer` per selected area: mode `audit` with `--full`, mode `diff` otherwise (a small diff needs only one or two reviewers in total). Give each the scope (diff command or paths), its area, the attack-surface map, and the scanner leads for its area.
+In one message, spawn the `bosun:security-reviewer` agents, mode `audit` with `--full`, mode `diff` otherwise: one per selected area, or for a small diff one or two in total with every selected area assigned to one of them. Each gets the scope (diff command or paths), its areas, the attack-surface map, and the scanner leads (log paths) for those areas.
 
 ## 4. Verify
 
-Send every critical and high finding, and any medium finding with low confidence, to `bosun:verifier`. Reproduction happens only locally (unit level, or against a server started on localhost), never against shared or production systems.
+Every critical and high finding, and any medium one with low confidence, goes to `bosun:verifier`. Reproduction happens only locally (unit level, or against a server started on localhost), never against shared or production systems.
 
 ## 5. Report
 
-Write `.bosun/reviews/<YYYY-MM-DD>-security.md`: overall risk; findings by severity (location, attacker, scenario, impact, fix, CWE when certain, verification status); controls that work; a hardening backlog; tools that ran and tools that weren't available. Never include secret values: give location and type only, and tell the user to rotate anything that looks real.
+Write `.bosun/reviews/<YYYY-MM-DD>-security.md`: overall risk; findings by severity (location, attacker, scenario, impact, fix, CWE when certain, verification status); controls that work; a hardening backlog; tools that ran and tools that weren't available. Never include secret values: location and type only, and tell the user to rotate anything that looks real.
 
 ## 6. --fix
 
-Fix confirmed findings through `bosun:implementer` (worktree), with a test that proves the fix where feasible. Gate each fix with `bosun:security-reviewer` in `diff` mode, then merge it into the current branch. Never commit directly to the default branch.
+Fix confirmed findings through `bosun:implementer` (worktree), with a test that proves the fix where feasible. Gate each fix with `bosun:security-reviewer` in `diff` mode, show the gated fixes, and merge them into the current branch only after the user's go-ahead. On the default branch, create or ask for a work branch first: never commit directly to the default branch.

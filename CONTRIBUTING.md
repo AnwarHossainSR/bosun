@@ -38,12 +38,16 @@ claude plugin install bosun@bosun-marketplace
 
 | Path | What it is |
 |---|---|
-| `plugins/bosun/skills/<name>/SKILL.md` | User-facing workflows (`/bosun:<name>`) |
+| `.claude-plugin/marketplace.json` | The marketplace that lists the plugin |
+| `plugins/bosun/.claude-plugin/plugin.json` | Plugin manifest (name, version) |
+| `plugins/bosun/skills/<name>/SKILL.md` | User-facing workflows (`/bosun:<name>`); `build/reference/execution.md` holds the build's edge cases |
 | `plugins/bosun/agents/<name>.md` | Subagent definitions (`bosun:<name>`) |
 | `plugins/bosun/scripts/taskboard.py` | Task board CLI used by the skills (standard library only) |
-| `plugins/bosun/hooks/` | Guard, activity log and context injection for bosun agents |
+| `plugins/bosun/hooks/` | Guard, activity log, result saving and context injection for bosun agents |
+| `plugins/bosun/templates/config.json` | Template for a project's `.bosun/config.json` |
 | `tests/` | Unit tests for the task board and the hooks |
 | `examples/` | Example plans: `taskflow-40` (classic PLAN.md) and `openspec-todo-api` (OpenSpec change + board) |
+| `docs/` | Images used by the README |
 
 ## Guidelines
 
@@ -52,6 +56,7 @@ claude plugin install bosun@bosun-marketplace
 - Keep the honesty rules: agents report only checks they ran, cite `path:line`, and mark unverified claims.
 - Don't add instructions that depend on a tool or setting unless you've checked it exists in current Claude Code. Link the docs in your PR.
 - Keep `SKILL.md` files under about 500 lines; move rarely needed detail into a `reference/` file.
+- Every prompt word is paid on every run, and frontmatter descriptions in every session. Keep descriptions to one or two short clauses, don't repeat what the startup hook already injects (project commands, output style, the result reminder), and hand agents file paths instead of pasted text. Compare `claude plugin details bosun` (always-on and per-invoke estimates) before and after a prompt change, and mention the difference in your PR.
 
 **Python scripts**
 - Standard library only, Python 3.10+.
