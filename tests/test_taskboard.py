@@ -120,6 +120,24 @@ class NextTests(unittest.TestCase):
         b = board(task("R", files=["src/"], agent="scout"), task("A", files=["src/a.ts"]))
         self.assertEqual(len(tb.plan_next(b, parallel=4)["start"]), 2)
 
+    def test_start_entries_carry_the_gate_inputs(self):
+        # The build picks review lenses from these instead of reading every brief.
+        b = board(task("A", files=["a"], risk="high", spec_refs=["todo-items#Items are private"]), task("B", files=["b"]))
+        start = {t["id"]: t for t in tb.plan_next(b, parallel=4)["start"]}
+        self.assertEqual((start["A"]["risk"], start["A"]["spec_refs"]), ("high", ["todo-items#Items are private"]))
+        self.assertEqual((start["B"]["risk"], start["B"]["spec_refs"]), ("unknown", []))
+
+    def test_json_output_is_one_compact_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tasks.json"
+            path.write_text(json.dumps(board(task("A", files=["a"]))))
+            proc = subprocess.run([sys.executable, str(SCRIPT), "next", str(path), "--json"],
+                                  capture_output=True, text=True, timeout=30)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout.count("\n"), 1)
+        self.assertNotIn(", ", proc.stdout)
+        self.assertEqual(json.loads(proc.stdout)["start"][0]["id"], "A")
+
     def test_stuck_and_complete(self):
         b = board(task("A", status="failed"), task("B", ["A"]))
         result = tb.plan_next(b, parallel=4)

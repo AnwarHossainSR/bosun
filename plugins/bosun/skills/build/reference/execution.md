@@ -34,7 +34,7 @@ When `git merge` reports a conflict:
 1. `git merge --abort`. The main checkout is back where it was.
 2. Only lockfiles or generated files conflict: merge again and resolve them by regenerating (run the install or the generator), then run checks and commit the merge.
 3. Small textual conflicts with an obvious union (imports, lists, registries): resolve them yourself, run the checks, commit the merge.
-4. Anything else: spawn an implementer in a new worktree (it starts from the work branch) with: "Merge `<task_branch>` into your branch, resolve the conflicts preserving the intent of both sides (the task's brief: `<TB> brief <board> <ID>`), run the tests, commit." Merge that agent's branch instead, and delete the old task branch.
+4. Anything else: spawn an implementer in a new worktree (it starts from the work branch) with: "Merge `<task_branch>` into your branch, resolve the conflicts preserving the intent of both sides (the task's brief: `<TB> brief <absolute board path> <ID>`), run the tests, commit." Merge that agent's branch instead, and delete the old task branch.
 
 Never resolve a conflict by throwing away one side wholesale without understanding it.
 
@@ -46,13 +46,12 @@ Agents from the earlier session are gone; `TB status <board>` and `git worktree 
 - `review` task: the board fields `branch` and `worktree`. With commits: run its gate (skill, section 2, step 3) before dispatching new work.
 - `in_progress` task: `branch` and `worktree` are written only at review, so they're missing or left over from an earlier attempt. Look in `git worktree list` for the worktree with commits named `<type>(<ID>): ...` or uncommitted changes in the task's files. A retry starts by merging the previous attempt's branch, so when several match, the latest attempt is the one whose branch contains the others (`git merge-base --is-ancestor <other_branch> <branch>`); the older ones are superseded. If you can't tell which worktree is the task's, don't guess: treat the task as having no work.
 - `in_progress` with commits or uncommitted changes: the work may be unfinished.
-  - Its worktree is itself mid-merge (`git -C <worktree> rev-parse -q --verify MERGE_HEAD` succeeds): don't stage or commit anything there (`git add` would mark conflicted files resolved, and git refuses a partial commit during a merge). List it in step 5 for the user, as it is.
-  - Otherwise check each uncommitted path with `git -C <worktree> status --porcelain --untracked-files=all` (it names the files inside new directories). Commit only those in the task's files, with path-limited commands: `git -C <worktree> add -- <paths>`, then `git -C <worktree> commit -m "<type>(<ID>): <summary>" -- <paths>` (never `git add -A`: the worktree can hold stray files). List any other path in step 5 for the user to decide.
-  - Then retry the task with an implementer whose prompt starts with "First run `git merge <task_branch>`".
+  - Its worktree is itself mid-merge (`git -C <worktree> rev-parse -q --verify MERGE_HEAD` succeeds): don't stage or commit anything there (`git add` would mark conflicted files resolved, and git refuses a partial commit during a merge). List it in step 5 for the user, as it is. No retry until the user has decided.
+  - Otherwise check each uncommitted path with `git -C <worktree> status --porcelain --untracked-files=all` (it names the files inside new directories). Commit only those in the task's files, with path-limited commands: `git -C <worktree> add -- <paths>`, then `git -C <worktree> commit -m "<type>(<ID>): <summary>" -- <paths>` (never `git add -A`: the worktree can hold stray files). List any other path in step 5 for the user to decide. Then retry the task with an implementer whose prompt starts with "First run `git merge <task_branch>`".
 - No work: set the task back to pending (skill, preflight step 4).
-- The work branch contains a merge for a task the board doesn't mark done (the session stopped between committing and `TB set --commit`): mark it done with that merge's sha.
+- The work branch contains a merge for a task the board doesn't mark done, or marks done without a `commit` (the session stopped between committing and `TB set --commit`): set it done with that merge's sha.
 
-**Unfinished merge in the main checkout** (`git rev-parse -q --verify MERGE_HEAD` succeeds, or after a squash the file at `git rev-parse --git-path SQUASH_MSG` exists). It usually means the session stopped between `git merge --no-commit` and `git commit`. The user may have started it instead, and a task match doesn't prove otherwise, so settle it only after the user's go-ahead. To propose an action:
+**Unfinished merge in the main checkout** (`git rev-parse -q --verify MERGE_HEAD` succeeds, or after a squash the file at `git rev-parse --git-path SQUASH_MSG` exists). It usually means the session stopped between `git merge --no-commit` and `git commit`. The user may have started it instead, and a task match doesn't prove otherwise, so settle it only after the user's go-ahead, and before any other resume action. To propose an action:
 - Find its task: `MERGE_HEAD` is the tip of the merged branch, and `SQUASH_MSG` lists the squashed commits (`<type>(<ID>): ...`). Compare them with the `branch` of each `review` task, and of each `done` task without a `commit` (the session stopped right after `TB set --status done`).
 - Check that it holds nothing else: every path in `git diff --cached --name-only` is in `git diff --name-only HEAD...<task_branch>`, and `git diff --name-only` (unstaged changes) lists nothing but conflicted paths. In both lists the plan's tasks.md is allowed too: `TB set --status done` ticks it in the working tree without staging it.
 - Conflicted paths (`git diff --name-only --diff-filter=U`) mean the session stopped while resolving a conflict. A half-done resolution can't be trusted, so propose undoing the merge.
@@ -61,7 +60,7 @@ Agents from the earlier session are gone; `TB status <board>` and `git worktree 
 
 **OpenSpec plans:** `TB status <board>` reports tasks.md drift; `TB sync <board>` repairs it, then commit tasks.md (not when the OpenSpec directory is local: git ignores it).
 
-Recent agent activity: `TB activity <board> --tail 30`; agents' final messages: `.bosun/results/`.
+Recent agent activity: `TB activity <board> --tail 30`; agents' final messages: `.bosun/plans/<name>/results/`.
 
 ## Agent teams (optional)
 

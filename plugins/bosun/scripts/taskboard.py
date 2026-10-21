@@ -1195,6 +1195,8 @@ def plan_next(board, parallel: int, strict_files: bool = False):
                 "kind": kind_of(t), "files": files_of(t), "critical_path": height[t["id"]],
                 "unblocks": ndesc[t["id"]],
                 "security_sensitive": bool(t.get("security_sensitive")),
+                # The gate picks its lenses from these, so the manager needn't read each brief.
+                "risk": t.get("risk", "unknown"), "spec_refs": spec_refs_of(t),
             }
             for t in start
         ],

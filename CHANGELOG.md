@@ -7,17 +7,27 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [0.4.0] - 2026-10-21
 
 ### Added
-- The SubagentStop hook saves each bosun agent's final message to `.bosun/results/<time>-<agent>-<task>-<id>.md` and logs the path as `saved` in `.bosun/activity.jsonl`. The manager no longer copies result blocks into report files, and points later agents to the saved file instead of pasting reports.
-- The context injected into bosun agents tells them to run long commands (tests, builds, scanners) into a log and read its last 40 lines unless something failed, and to keep prose before the BOSUN-RESULT block to three lines.
+- The hooks save each bosun agent's report to disk: next to its plan (`.bosun/plans/<name>/results/`) when its result block names the board, else in `.bosun/results/`, as `<time>-<agent>-<task>-<id>.md`. The absolute path is logged as `saved` in `.bosun/activity.jsonl`. The manager no longer copies result blocks into report files, and points later agents to the saved file instead of pasting reports. A build checks after its first agent that the hooks ran, and falls back to saving reports itself.
+- Newer Claude Code hands a subagent's report back through the `SubagentHandback` tool, so the agent's last message holds only closing text. A `PostToolUse` hook now saves and logs that report, and the stop that follows isn't flagged as missing a result block.
+- The context injected into bosun agents tells them to run long commands (tests, builds, scanners) into a log and read its tail, and to keep prose before the BOSUN-RESULT block to three lines unless they were asked for a map or a threat model.
+- The guard stops bosun agents other than the architect from running the task board's write commands (`init`, `set`, `add`, `sync`, `meta --set`); the manager is the board's only writer.
+- `TB next --json` includes each task's `risk` and `spec_refs`, so the build's gate can pick its lenses without reading every brief.
 
 ### Changed
-- About half the always-on cost: the skill and agent listings that load into every session dropped from about 2,560 to about 1,340 tokens (`claude plugin details bosun` estimates), with shorter descriptions and a shorter style rule in every skill and in the hook.
-- Task agents read their own brief with `taskboard.py brief`, so the manager no longer retypes briefs and project commands into every prompt (agents from outside bosun still get them pasted). Reviewers get the board path and task id.
-- Smaller review panels for small diffs: a build task under about 200 changed lines gets one code-reviewer for all its lenses, and `/bosun:review` uses one code-reviewer for every lens but security under about 300 lines. The code-reviewer accepts several lenses and tags each finding with its lens.
-- `/bosun:review` and `/bosun:review-pr` read only the diff's stat themselves and leave the full diff to the reviewers, so large PRs reach the reviewers sooner. `review-pr` reads the review skill from its path. The chat summary lists pre-existing issues as a count with the report path.
-- The build's resume procedure moved to `reference/execution.md`, read only when a build resumes.
+- About half the always-on cost: the skill and agent listings that load into every session dropped from about 2,560 to about 1,350 tokens (`claude plugin details bosun` estimates), with shorter descriptions and a shorter style rule in every skill and in the hook.
+- Task agents read their own brief with `taskboard.py brief`, so the manager no longer retypes briefs and project commands into every prompt (agents from outside bosun still get them pasted). Reviewers get the brief command with the board's absolute path, and every agent's result block names its board.
+- Smaller review panels for small diffs: a build task under about 200 changed lines gets one code-reviewer for all its lenses, and `/bosun:review` uses one code-reviewer for every lens but security under about 300 lines and 25 files. The code-reviewer accepts several lenses and tags each finding with its lens.
+- `/bosun:review` and `/bosun:review-pr` read small diffs themselves but only the stat of large ones, and find content-based lens triggers (security above all) with `git diff --name-only -G`, so large PRs reach the reviewers sooner without skipping a security review; when unsure, the security lens runs.
+- The build's resume procedure moved to `reference/execution.md`, read only when a build resumes, and an unfinished merge is now settled before any other resume action.
 - Task board `--json` output is one compact line instead of indented JSON.
+- Secret scanners in `/bosun:security-audit` run with redaction where supported, show only counts, and their logs are deleted after the report.
 - README rewritten around a diagram of the workflow; developer details moved to CONTRIBUTING.md, and the code of conduct now adopts the Contributor Covenant by reference.
+
+### Fixed
+- The build's spot-check commits a task's leftover changes with path-limited commands and re-checks the diff, instead of `git add -A`.
+- Resume marks a task done when its merge landed but the board has no commit for it, and never overwrites `base_commit`, which bounds the final review.
+- The hooks never write through a symbolic link out of the project, never overwrite another agent's saved report, and still log a stop when an agent's message contains malformed Unicode.
+- Every skill and agent description is plain YAML, so strict YAML parsers read the frontmatter too.
 
 ## [0.3.0] - 2026-10-19
 

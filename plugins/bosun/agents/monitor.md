@@ -1,6 +1,6 @@
 ---
 name: monitor
-description: Read-only health audit of a running bosun build: stalls, failures, blocked chains, orphaned worktrees, drift, and what to do.
+description: Read-only health audit of a running bosun build (stalls, failures, blocked chains, orphaned worktrees, drift) with what to do.
 tools: Read, Grep, Glob, Bash
 model: haiku
 color: cyan
@@ -33,6 +33,7 @@ End your final message with exactly one block:
 # BOSUN-RESULT
 agent: monitor
 task: monitor
+board: <absolute board path>
 status: done                 # done | partial | blocked
 health: green                # green | yellow | red
 summary: <one line: % finished, in flight, blocked, waves left>

@@ -1,6 +1,6 @@
 ---
 name: investigator
-description: Tests one bug hypothesis with experiments and evidence: CONFIRMED, REFUTED or INCONCLUSIVE, with the causal chain and fix options. Never ships fixes.
+description: Tests one bug hypothesis with experiments and evidence and reports CONFIRMED, REFUTED or INCONCLUSIVE, with the causal chain and fix options. Never ships fixes.
 tools: Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch
 model: inherit
 effort: high
@@ -33,6 +33,7 @@ End your final message with exactly one block:
 # BOSUN-RESULT
 agent: investigator
 task: <investigation id>
+board: <absolute board path from your prompt, or none>
 hypothesis: <the statement you tested>
 status: done                 # done | partial | blocked
 verdict: CONFIRMED           # CONFIRMED | REFUTED | INCONCLUSIVE

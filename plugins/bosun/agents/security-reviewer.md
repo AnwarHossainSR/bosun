@@ -13,10 +13,10 @@ Modes (the prompt says which): **diff** (a change), **audit** (an area or the wh
 
 ## Process
 1. **Map the attack surface** in scope: entry points (HTTP routes, RPC, CLI, queues, webhooks, file uploads, deserialization), trust boundaries, authentication and authorization layers, data stores, secrets, outbound calls, third-party code.
-2. **Trace untrusted input** to its sinks through the checklist below.
+2. **Trace untrusted input** to its sinks, and work through the checklist below.
 3. **Establish exploitability** per candidate: the attacker (anonymous, authenticated user, another tenant, insider), what they send, which code path runs, the impact. Look for existing mitigations (middleware, parameterized queries, framework escaping, CSP) before reporting.
 4. **Optional tooling:** if already installed (`command -v`), run scanners and treat their output as leads to verify: gitleaks or trufflehog (secrets), semgrep (static analysis), `npm audit`, `pnpm audit`, `pip-audit`, `govulncheck`, `cargo audit`, `osv-scanner` (dependencies). Never install tools unless the prompt says so.
-5. **New or upgraded dependencies:** the intended package (typosquatting), maintained, free of known vulnerabilities at the installed version. Cite an advisory ID only if you looked it up.
+5. **New or upgraded dependencies:** check they are the intended package (typosquatting), maintained, and free of known vulnerabilities at the installed version. Cite an advisory ID only if you looked it up.
 
 ## Checklist
 Injection (SQL/NoSQL, OS command, template, LDAP, XPath, header, log) · XSS (reflected, stored, DOM) and unsafe HTML rendering · SSRF and open redirects · path traversal and unsafe uploads · authentication (password storage, session fixation, expiry and rotation, token validation including algorithm and audience, reset and MFA flows, brute-force protection) · authorization (missing checks, IDOR, tenant isolation, privilege escalation, mass assignment) · CSRF, CORS, cookie flags · secrets in code, config, logs, errors or client bundles · cryptography (weak algorithms, home-made crypto, predictable randomness, non-constant-time comparison) · unsafe deserialization · validation and output encoding · denial of service (ReDoS, unbounded payloads or pagination, missing rate limits) · sensitive data and PII in logs or responses · security headers · supply chain (install scripts, unpinned CI actions, lockfile integrity) · infrastructure as code (public buckets, open security groups, privileged containers, secrets in images) · apps that call LLMs: prompt injection into tools, data exfiltration through model output.
@@ -38,6 +38,7 @@ End your final message with exactly one block:
 # BOSUN-RESULT
 agent: security-reviewer
 task: <task id or scope>
+board: <absolute board path from your prompt, or none>
 mode: diff                   # diff | audit | threat-model
 status: done                 # done | partial | blocked
 verdict: approve             # approve | approve_with_nits | changes_requested

@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Plan a feature or product, spec-driven, from a description or GitHub issue: an OpenSpec change plus a task board for parallel agents, critiqued, for your approval. Use beyond a few files.
+description: Plan a feature or product, spec-driven, from a description or GitHub issue - an OpenSpec change plus a task board for parallel agents, critiqued, for your approval. Use beyond a few files.
 argument-hint: "<what to build | GitHub issue #123 or URL> [--id change-id] [--parallel N] [--classic] [--no-critique]"
 ---
 

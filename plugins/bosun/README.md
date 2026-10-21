@@ -8,7 +8,7 @@ Full documentation: <https://github.com/AnwarHossainSR/bosun#readme>
 
 - **12 skills**: `manager`, `plan`, `build`, `status`, `archive`, `investigate`, `review`, `review-pr`, `security-audit`, `commit`, `ship`, `setup`. `ship`, `setup` and `archive` run only when you type them.
 - **10 agents**: architect, scout, implementer, test-engineer, docs-writer, code-reviewer, security-reviewer, verifier, investigator, monitor.
-- **3 hooks**, which act only on bosun's own agents (`agent_type` starting with `bosun:`): a guard before Bash and file edits; the project profile and output style when an agent starts; and, when it stops, an activity log entry plus a copy of its final message in `.bosun/results/`.
+- **4 hooks**, which act only on bosun's own agents (`agent_type` starting with `bosun:`): a guard before Bash and file edits; the project profile and output style when an agent starts; and, when it stops or hands back its report, an activity log entry plus a copy of the report next to its plan (`.bosun/plans/<name>/results/`, or `.bosun/results/`).
 
 ## What it runs, writes and connects to
 
@@ -20,7 +20,7 @@ The guard is a safety net against accidents, not a security boundary. Keep your 
 
 ## Where it works
 
-Claude Code with git and Python 3.10+ (validated and installed on Claude Code 2.1.240 and 2.1.303). On claude.ai chat, plugin agents and hooks don't load, so bosun isn't useful there; Cowork hasn't been tested.
+Claude Code with git and Python 3.10+ (validated and installed on Claude Code 2.1.240, 2.1.303 and 2.1.306). On claude.ai chat, plugin agents and hooks don't load, so bosun isn't useful there; Cowork hasn't been tested.
 
 ## Install
 
