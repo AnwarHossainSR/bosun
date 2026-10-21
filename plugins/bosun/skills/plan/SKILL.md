@@ -12,7 +12,7 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"`. Read `.bosun/config
 
 **Style:** `output_style` in the config (default `caveman`): your prose and agent prompts terse, no filler; code, commands, paths, errors, numbers and quotes exact; keep logic words (because, so, but, not, only, can, may, must); full sentences for warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty; never drop a fact or an uncertainty label. Specs, commits, PR text and docs: normal prose. `normal` turns it off.
 
-The SubagentStop hook saves agents' final messages in `.bosun/results/`: hand later agents those file paths instead of pasting reports into prompts (no file saved: paste a summary).
+When `.bosun/` exists, the SubagentStop hook saves each bosun agent's final message as `.bosun/results/<UTC time>-<agent>-<task>-<agent id>.md`, where `<task>` is its result block's `task`. Create `.bosun/` first if it's missing (the board goes there anyway), give every agent a unique task label (such as `recon-auth`), find its file with `ls -t .bosun/results/*-<agent>-<label>-*`, and hand later agents that absolute path plus exactly which items to act on (accepted ids) instead of pasting the report. No file: paste a summary.
 
 ## 0. Format
 

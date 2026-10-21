@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: Root-cause a bug, failing or flaky test, incident or regression with parallel hypothesis tests and verification; report with fix options, --fix fixes test-first. Use for debugging.
+description: Root-cause a bug, failing or flaky test, incident, regression or "why does X happen" with parallel hypothesis tests and verification; report with fix options, --fix fixes test-first. Use for debugging.
 argument-hint: "<symptom, error message, failing test or issue link> [--fix]"
 ---
 
@@ -10,7 +10,7 @@ Problem: $ARGUMENTS
 
 **Style:** `output_style` in `.bosun/config.json` (default `caveman`): your prose and agent prompts terse, no filler; code, commands, paths, errors, numbers and quotes exact; keep logic words (because, so, but, not, only, can, may, must); full sentences for warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty; never drop a fact or an uncertainty label. Commits, PR text, docs and specs: normal prose. `normal` turns it off.
 
-Long command output goes to a log you tail: `log=$(mktemp); <cmd> >"$log" 2>&1; echo "exit $?"; tail -n 40 "$log"`. Agents' final messages are saved in `.bosun/results/`.
+Long command output goes to a log you tail: `log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; echo "exit $?"; tail -n 40 "$log"`. If the tail doesn't show the cause (the first error, the top of a traceback), grep or read more of that log. When `.bosun/` exists, agents' final messages are also saved in `.bosun/results/`.
 
 ## 1. Frame the problem
 

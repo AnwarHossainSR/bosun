@@ -21,7 +21,7 @@ Arguments: $ARGUMENTS
 
 ## 2. Quality gate (run it yourself, report the real results)
 
-The commands from `.bosun/config.json`, or the ones you detect: lint, typecheck, test, build, each into a log you tail (`log=$(mktemp); <cmd> >"$log" 2>&1; echo "exit $?"; tail -n 40 "$log"`). Any failure: stop, show it, offer to fix it.
+The commands from `.bosun/config.json`, or the ones you detect: lint, typecheck, test, build, each into a log you tail (`log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; echo "exit $?"; tail -n 40 "$log"`). Any failure: stop, show it (the first error too, not just the tail: grep that log), offer to fix it.
 
 ## 3. Quick review
 
@@ -31,7 +31,7 @@ Skip with `--no-review`, or when `.bosun/reviews/` already has a review of this 
 
 - **Title**: the repository's convention (Conventional Commits, for example), 72 characters at most.
 - **Body**: a PR template (`.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, `docs/pull_request_template.md`, or `PULL_REQUEST_TEMPLATE.md`): keep its headings and fill them from the actual changes. Otherwise: Summary, Changes, How to test, Risks and rollout, Linked issues. Draw on the commits, the plan's SUMMARY.md if there is one, and the gate results.
-- **Issue link**: the plan's `meta.issue`, or without a plan an issue the commits reference or the user names; `#<n>` in this repository, `<owner>/<repo>#<n>` in another. `Closes` when the work delivers everything the issue asks for and the PR targets the default branch, otherwise `Refs`. GitHub acts on closing keywords in a PR body only for PRs to the default branch, but also on closing keywords in commit messages once those commits reach the default branch. So check `git log --format=%B origin/<base>..HEAD` for close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved followed by the issue before you tell the user which keyword you used and whether merging will close the issue. A commit that would close it anyway: say so; rewording it rewrites history, so only offer it.
+- **Issue link**, in the body (under the template's linked-issues heading if it has one, otherwise as the last line): the plan's `meta.issue`, or without a plan an issue the commits reference or the user names; `#<n>` in this repository, `<owner>/<repo>#<n>` in another. `Closes` when the work delivers everything the issue asks for and the PR targets the default branch, otherwise `Refs`. GitHub acts on closing keywords in a PR body only for PRs to the default branch, but also on closing keywords in commit messages once those commits reach the default branch. So check `git log --format=%B origin/<base>..HEAD` for close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved followed by the issue before you tell the user which keyword you used and whether merging will close the issue. A commit that would close it anyway: say so; rewording it rewrites history, so only offer it.
 - Don't invent issue numbers, test results, screenshots or metrics; report only checks you actually ran.
 - Write the body to a temp file.
 

@@ -15,7 +15,7 @@ Needs the GitHub CLI: `gh auth status` must succeed; if not, explain `gh auth lo
 ## 1. Fetch
 
 - `gh pr view <pr> --json number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,additions,deletions,changedFiles,files,commits,labels,reviewDecision,statusCheckRollup,url`
-- Size from the fields above (`additions`, `deletions`, `changedFiles`, `files`). Don't read the whole diff yourself: the reviewers do, and a large one would fill your context. A very large PR: tell the user and split the review by area.
+- Size from the fields above (`additions`, `deletions`, `changedFiles`, `files`). Under about 300 changed lines, read the diff (`gh pr diff <pr>`) to pick lenses. Larger: don't read the whole diff (the reviewers do, and it would fill your context); after step 2, find content triggers for lenses (`security` above all) with `git diff <merge-base>...bosun/pr-<number> --name-only -G'<trigger regex>'` (fetch failed: grep the saved diff), or open those files' diffs. Unsure whether `security` applies: include it. A very large PR: tell the user and split the review by area.
 - Existing review comments, so you don't repeat them: `gh api repos/{owner}/{repo}/pulls/<number>/comments --paginate`
 - Issues linked in the description (`gh issue view <n>`), for intent.
 

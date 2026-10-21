@@ -17,7 +17,7 @@ Scope: $ARGUMENTS
 
 ## 2. Scanners (optional)
 
-Check what's installed (`command -v gitleaks trufflehog semgrep osv-scanner pip-audit govulncheck cargo-audit trivy`, plus the package manager's audit command). Run the relevant ones, each into a log (`log=$(mktemp); <cmd> >"$log" 2>&1; echo "exit $?"; tail -n 40 "$log"`), and keep their output as leads for the reviewers. Install nothing without asking. Note which tools weren't available.
+Check what's installed (`command -v gitleaks trufflehog semgrep osv-scanner pip-audit govulncheck cargo-audit trivy`, plus the package manager's audit command). Run the relevant ones, each into its own log (`log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; echo "exit $?"; tail -n 40 "$log"`); when the tail doesn't show the findings, grep or read more of that log. Secret scanners print the secrets they find: run them with redaction where the tool supports it (gitleaks: `--redact`), show only their exit status and finding count instead of the tail, and delete every scanner log once the report is written. Keep the output as leads for the reviewers. Install nothing without asking. Note which tools weren't available.
 
 ## 3. Review in parallel
 
