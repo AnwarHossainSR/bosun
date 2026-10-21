@@ -24,7 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 STATUSES = ("pending", "in_progress", "review", "done", "blocked", "failed", "skipped")
 FINISHED = frozenset({"done", "skipped"})
 INFLIGHT = frozenset({"in_progress", "review"})
@@ -209,7 +209,8 @@ def natural_key(value: str):
 
 
 def emit_json(data) -> None:
-    print(json.dumps(data, indent=2, ensure_ascii=False))
+    # One compact line: agents read this output on every scheduling step, and whitespace is tokens.
+    print(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
 
 
 def shorten(text: str, width: int) -> str:

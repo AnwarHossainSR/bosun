@@ -219,6 +219,7 @@ class EventTests(unittest.TestCase):
         self.assertEqual(out["hookEventName"], "SubagentStart")
         self.assertIn("test: pnpm test", out["additionalContext"])
         self.assertIn("Output style: caveman", out["additionalContext"])
+        self.assertIn('echo "exit $?"; tail -n 40', out["additionalContext"])
         self.assertNotIn("profile cut to fit", out["additionalContext"])
         log = (self.root / ".bosun" / "activity.jsonl").read_text().splitlines()
         self.assertEqual(json.loads(log[-1])["event"], "start")
@@ -294,6 +295,25 @@ class EventTests(unittest.TestCase):
         entry = json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
         self.assertEqual((entry["task"], entry["status"], entry["summary"]), ("T07", "done", "Added rotation"))
 
+    def test_stop_saves_the_final_message(self):
+        message = "Done.\n\n```yaml\n# BOSUN-RESULT\nagent: implementer\ntask: 2.1\nstatus: done\nsummary: ok\n```\n"
+        proc = self.run_hook(self.base("SubagentStop", last_assistant_message=message, stop_hook_active=False))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        entry = json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
+        saved = self.root / entry["saved"]
+        self.assertEqual(saved.read_text(), message)
+        self.assertRegex(saved.name, r"^\d{8}T\d{6}Z-implementer-2\.1-a1\.md$")
+        self.assertEqual(saved.parent, self.root / ".bosun" / "results")
+
+    def test_saved_message_keeps_the_end_and_odd_names_are_safe(self):
+        message = "x" * (hooks.MAX_SAVED_CHARS + 10) + "\n# BOSUN-RESULT\ntask: ../../etc/passwd\nstatus: done\n"
+        self.run_hook(self.base("SubagentStop", agent="bosun:code-reviewer", last_assistant_message=message))
+        entry = json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
+        saved = self.root / entry["saved"]
+        self.assertEqual(saved.parent, self.root / ".bosun" / "results")
+        self.assertIn("-code-reviewer-etc-passwd-", saved.name)
+        self.assertEqual(saved.read_text(), message[-hooks.MAX_SAVED_CHARS:])
+
     def test_missing_result_is_logged_and_optionally_enforced(self):
         payload = self.base("SubagentStop", last_assistant_message="done!", stop_hook_active=False)
         self.assertEqual(self.run_hook(payload).returncode, 0)
@@ -328,6 +348,11 @@ class EventTests(unittest.TestCase):
                                   text=True, env=dict(env, CLAUDE_PROJECT_DIR=other.name, BOSUN_OUTPUT_STYLE="normal"),
                                   timeout=30)
             self.assertEqual((proc.returncode, proc.stdout), (0, ""))
+            stop = dict(payload, hook_event_name="SubagentStop", last_assistant_message="# BOSUN-RESULT\nstatus: done\n")
+            proc = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(stop), capture_output=True,
+                                  text=True, env=dict(env, CLAUDE_PROJECT_DIR=other.name), timeout=30)
+            self.assertEqual(proc.returncode, 0)
+            self.assertFalse((Path(other.name) / ".bosun").exists())
         finally:
             other.cleanup()
 
@@ -339,7 +364,7 @@ class EventTests(unittest.TestCase):
 class SkillStyleTests(unittest.TestCase):
     def test_every_skill_restates_the_hook_style_rules(self):
         # Skills run in the main session, which the hook never reaches, so each SKILL.md repeats the rules.
-        rule = next(r for r in hooks.STYLE_RULES if r.startswith("Keep the words that carry logic"))
+        rule = next(r for r in hooks.STYLE_RULES if r.startswith("Keep logic words"))
         words = rule.split(":", 1)[1].strip().rstrip(".")
         skills = sorted((ROOT / "plugins" / "bosun" / "skills").glob("*/SKILL.md"))
         self.assertTrue(skills)

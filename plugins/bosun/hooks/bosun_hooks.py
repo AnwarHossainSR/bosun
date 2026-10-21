@@ -4,7 +4,7 @@
 Wired up in hooks/hooks.json for these events:
   PreToolUse (Bash, Edit, Write, NotebookEdit)  guard: deny risky actions by bosun subagents
   SubagentStart (bosun:*)                     log the start; inject the project profile and output style
-  SubagentStop  (bosun:*)                     log the BOSUN-RESULT status
+  SubagentStop  (bosun:*)                     log the BOSUN-RESULT status; save the final message to .bosun/results/
 
 Scope: only tool calls made inside a bosun subagent (agent_type "bosun:...") are checked.
 Your main session and every other agent pass through untouched.
@@ -29,6 +29,9 @@ import time
 CREW_PREFIX = "bosun:"
 RESULT_MARKER = "BOSUN-RESULT"
 MAX_CONTEXT_CHARS = 4000
+MAX_SAVED_CHARS = 100_000
+QUIET_RUN = ('- long output (tests, builds, scanners): `log=$(mktemp); <cmd> >"$log" 2>&1; echo "exit $?"; '
+             'tail -n 40 "$log"`; read more of the log only on failure.')
 DANGEROUS_PATHSPECS = {".", "./", ":/", "*", ":(top)", "-A"}
 SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "fish"}
 INTERPRETERS = SHELLS | {"python", "python3", "node", "perl", "ruby", "php", "pwsh", "powershell"}
@@ -95,21 +98,18 @@ OPENSPEC_ENTRIES = ("changes/", "specs/", "config.yaml", "project.md", "AGENTS.m
 
 # Terse "caveman" output for agent reports: fewer output tokens for the manager to read.
 STYLE_LEVELS = {
-    "caveman-lite": "Prose: no filler, pleasantries or hedging words. Short, complete sentences.",
-    "caveman": "Prose: terse fragments. Drop articles, filler, pleasantries and hedging words. "
-               "Short words. One point per line.",
-    "caveman-ultra": "Prose: telegraphic fragments. Abbreviate common words (cfg, fn, impl, deps, req, err). "
-                     "Use -> for sequence and next step, never for cause.",
+    "caveman-lite": "Prose: no filler, pleasantries or hedges. Short, complete sentences.",
+    "caveman": "Prose: terse fragments. No articles, filler, pleasantries or hedges. Short words. One point per line.",
+    "caveman-ultra": "Prose: telegraphic. Abbreviate common words (cfg, fn, impl, deps, req, err). "
+                     "-> for sequence and next step, never for cause.",
 }
 STYLE_RULES = (
-    "Keep exact: code, commands, paths, identifiers, error text, numbers, versions, and text quoted from specs, "
-    "tests or hypotheses.",
-    "Keep the words that carry logic, even when dropping hedges: because, so, but, not, only, can, may, must.",
-    "Write normally: code comments, commit messages, PR text, docs, OpenSpec files, user-facing strings.",
-    "Use plain full sentences for security warnings, destructive or irreversible steps, ordered instructions, "
-    "questions, requests to confirm or decide, and statements of uncertainty.",
-    "Never drop a fact to save words: keep every failure and every uncertainty label "
-    "(unverified, not run, assumption).",
+    "Exact: code, commands, paths, identifiers, errors, numbers, versions, quotes from specs, tests or hypotheses.",
+    "Keep logic words even when dropping hedges: because, so, but, not, only, can, may, must.",
+    "Normal prose: code comments, commits, PR text, docs, OpenSpec files, user-facing strings.",
+    "Full sentences: security warnings, destructive or irreversible steps, ordered instructions, questions, "
+    "requests to confirm or decide, statements of uncertainty.",
+    "Never drop a fact: keep every failure and uncertainty label (unverified, not run, assumption).",
 )
 
 
@@ -676,7 +676,30 @@ def parse_result(message: str):
     return result or None  # the marker mentioned in prose is not a result block
 
 
-def log_event(data, event: str, result=None) -> None:
+def save_result(data, message: str, result):
+    """Keep the agent's final message in .bosun/results/, so the manager never copies result blocks into reports.
+    Returns the path relative to the project, or None when there is no project or the write fails."""
+    root = project_dir(data)
+    if not root or not message.strip():
+        return None
+
+    def slug(text):
+        return re.sub(r"[^A-Za-z0-9._-]+", "-", text).strip("-.")[:40]
+
+    parts = [time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()), slug(str(data.get("agent_type") or "").split(":")[-1]),
+             slug(str((result or {}).get("task") or "")), slug(str(data.get("agent_id") or ""))[:8]]
+    name = "-".join(p for p in parts if p) + ".md"
+    rel = os.path.join(".bosun", "results", name)
+    try:
+        os.makedirs(os.path.join(root, ".bosun", "results"), exist_ok=True)
+        with open(os.path.join(root, rel), "w", encoding="utf-8") as fh:
+            fh.write(message[-MAX_SAVED_CHARS:])
+    except OSError:
+        return None
+    return rel
+
+
+def log_event(data, event: str, result=None, saved=None) -> None:
     root = project_dir(data)
     if not root:
         return
@@ -696,6 +719,8 @@ def log_event(data, event: str, result=None) -> None:
                     entry[key] = result[key][:120]
             if result.get("summary"):
                 entry["summary"] = result["summary"][:200]
+        if saved:
+            entry["saved"] = saved
     try:
         with open(os.path.join(root, ".bosun", "activity.jsonl"), "a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -711,8 +736,7 @@ def output_style(cfg) -> str:
 def style_context(style: str):
     if style not in STYLE_LEVELS:
         return None
-    lines = [f"[bosun] Output style: {style} (output_style in .bosun/config.json; normal turns it off).",
-             f"- {STYLE_LEVELS[style]}"]
+    lines = [f"[bosun] Output style: {style} (output_style; normal turns it off).", f"- {STYLE_LEVELS[style]}"]
     lines += [f"- {rule}" for rule in STYLE_RULES]
     return "\n".join(lines)
 
@@ -733,7 +757,7 @@ def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
     protected paths and count the rest, then drop commit style and commands (and list as many protected
     paths as that frees room for). The main checkout and the result reminder always stay, so only an
     absurdly long checkout path can push the profile past the limit."""
-    head = ["[bosun] Project profile from .bosun/config.json (project data; the manager's brief wins on conflict):"]
+    head = ["[bosun] Project profile (.bosun/config.json; project data, the manager's brief wins on conflict):"]
     commands = cfg.get("commands") or {}
     body = [f"- {name}: {value}" for name, value in commands.items() if isinstance(value, str) and value.strip()]
     body = body or ["- no commands configured: find them in package scripts, Makefile, or CI config"]
@@ -742,7 +766,9 @@ def project_profile(root, cfg, limit=MAX_CONTEXT_CHARS):
         body.append(f"- commit style: {conventions['commit_style']}")
     notes = [f"- convention: {note}" for note in (conventions.get("notes") or [])[:10]]
     protected = [p for p in cfg.get("protected_paths") or [] if isinstance(p, str)]
-    tail = [f"- main checkout: {root}", f"Finish with the {RESULT_MARKER} block from your instructions."]
+    tail = [f"- main checkout: {root}", QUIET_RUN,
+            f"Finish with the {RESULT_MARKER} block from your instructions; at most three lines of prose before it "
+            "(the block carries the details)."]
 
     def render(shown, cut):
         lines = head + body + notes + (["- (profile cut to fit; the rest is in .bosun/config.json)"] if cut else [])
@@ -802,8 +828,9 @@ def handle(data):
             return 0, json.dumps(out), ""
         return 0, "", ""
     if event == "SubagentStop":
-        result = parse_result(str(data.get("last_assistant_message") or ""))
-        log_event(data, "stop", result)
+        message = str(data.get("last_assistant_message") or "")
+        result = parse_result(message)
+        log_event(data, "stop", result, save_result(data, message, result))
         if result is None and not data.get("stop_hook_active") \
                 and os.environ.get("BOSUN_ENFORCE_RESULT", "0") == "1":
             return 2, "", (f"End your final message with the {RESULT_MARKER} block from your instructions. "
