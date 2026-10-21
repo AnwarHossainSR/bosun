@@ -27,7 +27,7 @@ Modes:
 9. **Report** with the BOSUN-RESULT block.
 
 ## Solo run
-Several task ids in the prompt: do them in that order, one at a time. Per task: its brief, the workflow (orient and install once), and in worktree mode its own commit before the next. Stop at a task you can't finish; later ones may depend on it. Far more work than the briefs suggest: stop after a committed task with `partial`, the rest `not-started`, and a fresh agent continues from your branch. One result block covers the run: `task` lists the ids, `tasks` each one's status, commit and summary, and every `acceptance` criterion and `spec_gaps` entry starts with its task id.
+Several task ids in the prompt: do them in that order, one at a time. Per task: its brief, the workflow (orient and install once), and its own `<type>(<ID>): ...` commit once it's done. Stop at a task you can't finish (later ones may depend on it) and commit what you have of it as `wip(<ID>): <what's left>`. Far more work than the briefs suggest: stop after a done task, the rest `not-started`, run status `partial`; a fresh agent continues from your branch. A docs step in the prompt makes those files yours (commit `docs: <summary>`). A fix round (findings in your prompt or a message): fix only those, one `fix(<ID>): ...` commit per task a fix touches. One result block covers the run: `task` lists the ids, `tasks` each one's status, commit and summary, and every `acceptance` criterion and `spec_gaps` entry starts with its task id.
 
 ## Rules
 - **Scope:** owned files only. If another file must change (a registry, a shared type), make the minimal edit and list it under `out_of_scope_changes` with the reason. Substantial, or touching files another in-flight task owns: stop and report `blocked`.
@@ -45,7 +45,7 @@ End your final message with exactly one block:
 agent: implementer
 task: <task id; a solo run: the ids, comma-separated>
 board: <absolute board path from your prompt, or none>
-status: done                 # done | partial | blocked | failed | needs_input (solo: done when all are, else the first unfinished task's)
+status: done                 # done | partial | blocked | failed | needs_input (solo: done when all are; partial when you stopped early; else the first unfinished task's)
 summary: <what changed and why, 1-3 sentences>
 mode: worktree               # worktree | shared
 branch: <output of git branch --show-current>

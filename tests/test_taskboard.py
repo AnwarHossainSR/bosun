@@ -215,10 +215,27 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(at_limit["route"], "solo")
 
     def test_tasks_for_other_agents_need_the_crew(self):
-        for extra in ({"agent": "scout"}, {"agent": "my-team-agent"}, {"kind": "report"}):
+        # Another plugin's implementer is not bosun's: the solo run would replace it with bosun:implementer.
+        for extra in ({"agent": "scout"}, {"agent": "my-team-agent"}, {"kind": "report"}, {"agent": "acme:implementer"}):
             result = tb.plan_route(board(task("A"), task("B", ["A"], **extra)))
             self.assertEqual((result["route"], result["solo_ok"], result["large"]), ("crew", False, False), extra)
             self.assertIn("needs its own agent: B", result["reasons"][0])
+
+    def test_bosun_writer_names_and_blank_agents_run_solo(self):
+        b = board(task("A", agent="bosun:implementer"), task("B", agent="  "), task("C", agent="bosun:docs-writer"))
+        self.assertEqual(tb.plan_route(b)["route"], "solo")
+
+    def test_review_tasks_wait_for_their_gate_not_an_implementer(self):
+        # A resume gates tasks in review first; they are built, so they stay out of the order but unblock dependents.
+        b = board(task("A", status="done"), task("B", ["A"], status="review"), task("C", ["A"], status="in_progress"),
+                  task("D", ["B", "C"]))
+        result = tb.plan_route(b)
+        self.assertEqual((result["order"], result["in_review"], result["tasks"]), (["C", "D"], ["B"], 2))
+        self.assertEqual(tb.plan_route(b, only=["D"])["waiting"], ["D"])  # C is unlisted and unfinished
+        b["tasks"].append(task("E", ["B"]))
+        self.assertEqual(tb.plan_route(b, only=["E"])["route"], "solo")  # not stuck behind a task in review
+        only_review = tb.plan_route(board(task("A", status="done"), task("B", ["A"], status="review")))
+        self.assertEqual((only_review["route"], only_review["in_review"]), ("none", ["B"]))
 
     def test_waiting_stuck_and_only(self):
         b = board(task("A", status="blocked"), task("B", ["A"]), task("C"), task("D", ["C"]))
@@ -324,6 +341,28 @@ class CliTests(unittest.TestCase):
         self.assertIn("Route: solo", self.run_tb("status", "demo").stdout)
         self.run_tb("meta", "demo", "--set", "route=crew")
         self.assertIn("do not touch their files", self.run_tb("brief", "demo", "T03").stdout)
+
+    def test_solo_run_reads_as_one_run(self):
+        self.run_tb("set", "demo", "T01", "T02", "T03", "--status", "in_progress")
+        self.assertIn("in_progress but its deps", self.run_tb("validate", "demo").stdout)
+        self.run_tb("meta", "demo", "--set", "route=solo")
+        out = self.run_tb("validate", "demo").stdout
+        self.assertNotIn("in_progress but its deps", out)  # a solo run marks its tasks in flight together
+        self.assertIn("one solo run in order", self.run_tb("status", "demo").stdout)
+
+    def test_route_text_outcomes(self):
+        self.run_tb("set", "demo", "T01", "--status", "blocked")
+        out = self.run_tb("route", "demo").stdout
+        self.assertIn("route: stuck", out)
+        self.assertIn("waiting (behind blocked", out)
+        self.run_tb("set", "demo", "T01", "T02", "T03", "T04", "T05", "T06", "--status", "done")
+        self.assertIn("route: none", self.run_tb("route", "demo").stdout)
+        board9 = self.root / ".bosun" / "plans" / "big" / "tasks.json"
+        board9.parent.mkdir(parents=True)
+        board9.write_text(json.dumps(board(*[task(f"T{i}", size="S") for i in range(9)])))
+        out = self.run_tb("route", str(board9)).stdout
+        self.assertIn("route: crew", out)
+        self.assertIn("solo order: T0 T1", out)  # --solo still has an order to use
 
     def test_route_cli(self):
         result = json.loads(self.run_tb("route", "demo", "--json").stdout)

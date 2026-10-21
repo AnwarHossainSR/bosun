@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AnwarHossainSR/bosun/actions/workflows/ci.yml/badge.svg)](https://github.com/AnwarHossainSR/bosun/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-On a ship, the bosun runs the deck crew. **bosun** runs a crew of Claude Code agents for you: give it a goal, and a manager picks the lightest workflow, then specialist agents plan, build, review and ship it, as many as the work needs, with a review gate before anything merges.
+On a ship, the bosun runs the deck crew. **bosun** runs a crew of Claude Code agents for you: give it a goal, and a manager picks the lightest workflow, then specialist agents plan, build, review and ship it, as many as the work needs, with review gates along the way.
 
 <p align="center">
   <img src="docs/bosun-flow.svg" width="100%" alt="How bosun works: your goal goes to the manager, which runs plan, build, review and ship with specialist agents sized to the work">
@@ -31,7 +31,7 @@ Then, in Claude Code inside your project:
 ```text
 /bosun:setup                              one-time: detects your commands, writes .bosun/config.json
 /bosun:plan add CSV export to reports     spec and task board for your approval (or /bosun:plan #123)
-/bosun:build                              builds it: one agent, or a parallel crew for a big plan
+/bosun:build                              builds it: one implementer, or a parallel crew for a big plan
 /bosun:review                             multi-lens review of the branch
 /bosun:ship                               final checks, push and pull request (asks first)
 ```
@@ -55,7 +55,7 @@ Not sure which command fits? `/bosun:manager <goal in plain words>` picks one fo
 | Command | What it does |
 |---|---|
 | `/bosun:manager <goal>` | Routes any goal to the lightest workflow, from a single agent to a full crew. |
-| `/bosun:plan <idea \| #issue>` | Clarifying questions, an OpenSpec change and task board, your approval. Large or security-sensitive work also gets scouts and a critique round (`--solo` or `--crew` to choose). `--classic` writes a PLAN.md instead. |
+| `/bosun:plan <idea \| #issue>` | Clarifying questions, an OpenSpec change and task board, your approval. Large or security-sensitive work also gets scouts and a critique round; `--solo` skips them, `--crew` adds them, and the flag carries over to the build. `--classic` writes a PLAN.md instead. |
 | `/bosun:build [plan]` | Runs the board solo or with parallel agents in worktrees, review-gated merges and resume (`--solo`, `--crew`, `--resume`, `--parallel N`, `--dry-run`). |
 | `/bosun:status [--audit]` | Progress, work in flight, blocked tasks, what's next; `--audit` adds a health check. |
 | `/bosun:review [target]` | Parallel lens review of the branch, staged or working changes, a range or a commit; `--fix` applies confirmed fixes. |
@@ -88,11 +88,11 @@ Every agent ends with a short `# BOSUN-RESULT` block that the manager acts on.
 
 ## How a build runs
 
-The task board picks the route from the plan's size; `--solo` or `--crew` picks it yourself.
+The task board picks the route from the plan's size and agents; `--crew` forces the crew, and `--solo` a solo run unless a task needs its own agent.
 
-**Solo**, for plans of up to 8 tasks and 16 size-units (S 1, M 2, L 3) whose tasks are all for the implementer, test-engineer or docs-writer. One implementer works through the tasks in tasks.md order, in one git worktree, with a commit per task and tests first. Then one review of the whole run (correctness, tests and spec, plus security when it matters), one `--no-ff` merge and the full checks. A run that stops early continues from its commits.
+**Solo**, for plans of up to 8 tasks and 16 size-units (S 1, M 2, L 3) whose tasks are all code tasks for the implementer, test-engineer or docs-writer, in worktree mode. One implementer works through the tasks in tasks.md order, in one git worktree, with a commit per task and tests first. Then one review of the whole run (correctness, tests and spec, plus security when it matters), one `--no-ff` merge and the full checks. A run that stops early continues from its commits.
 
-**Crew**, for bigger plans:
+**Crew**, for bigger plans, plans with a task for another agent, and shared mode:
 
 1. **Schedule.** The task board starts tasks whose dependencies are done and whose files don't overlap work in flight, critical path first, keeping up to `--parallel` agents busy (default 4).
 2. **Build.** Each implementer works in its own git worktree and reads its brief, which quotes the requirements it implements. Tests come first.

@@ -325,6 +325,9 @@ class EventTests(unittest.TestCase):
         entry = self.last_entry()
         self.assertEqual((entry["task"], entry["status"], entry["commit"]), ("1.1,1.2,2.1", "partial", "b2"))
         self.assertRegex(Path(entry["saved"]).name, r"^\d{8}T\d{6}Z-implementer-1\.1-1\.2-2\.1-a1\.md$")
+        many = ",".join(f"{g}.{n}" for g in (1, 2, 3) for n in (1, 2, 3, 4))  # 12 ids: past the name limit
+        self.run_hook(self.base("SubagentStop", last_assistant_message=f"# BOSUN-RESULT\ntask: {many}\nstatus: done\n"))
+        self.assertRegex(Path(self.last_entry()["saved"]).name, r"-implementer-1\.1-to-3\.4-12-tasks-a1\.md$")
 
     def last_entry(self):
         return json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
@@ -439,7 +442,9 @@ class EventTests(unittest.TestCase):
         self.assertEqual(self.run_hook(payload).returncode, 0)
         entry = json.loads((self.root / ".bosun" / "activity.jsonl").read_text().splitlines()[-1])
         self.assertEqual(entry["status"], "no-result-block")
-        self.assertEqual(self.run_hook(payload, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 2)
+        proc = self.run_hook(payload, {"BOSUN_ENFORCE_RESULT": "1"})
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("partial", proc.stderr)  # a solo run that stopped early isn't blocked
         payload["stop_hook_active"] = True
         self.assertEqual(self.run_hook(payload, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 0)
 

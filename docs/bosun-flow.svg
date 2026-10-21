@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" role="img" aria-labelledby="title desc">
   <title id="title">How bosun works</title>
-  <desc id="desc">You give the bosun manager a goal. It picks the lightest workflow and runs specialist agents sized to the work: plan (an architect, with scouts and a critique and threat model when the work is large or risky, then your approval), build (one implementer task by task for a small plan, or implementers in parallel git worktrees for a big one, with review gates before merging), review (lens reviewers and a verifier) and ship (final checks and a pull request). Investigation, security audit, PR review, status and commits are also available.</desc>
+  <desc id="desc">You give the bosun manager a goal. It picks the lightest workflow and runs specialist agents sized to the work: plan (an architect, with scouts and a critique and threat model when the work is large or security-sensitive, then your approval), build (one implementer task by task for a small plan, or implementers in parallel git worktrees for a big one, with review gates before merging), review (lens reviewers and a verifier) and ship (final checks and a pull request). Investigation, security audit, PR review, status and commits are also available.</desc>
   <style>
     .bg { fill: #ffffff; stroke: #d0d7de; }
     .card { fill: #f6f8fa; stroke: #d0d7de; }
@@ -69,12 +69,12 @@
   <rect class="stack plan-s" x="64" y="214" width="226" height="30" rx="8"/>
   <rect class="stack plan-s" x="61" y="218" width="226" height="30" rx="8"/>
   <rect class="chip" x="58" y="222" width="226" height="30" rx="8"/>
-  <text class="t" x="72" y="242" font-size="12.5">scouts if large or risky</text>
+  <text class="t" x="72" y="242" font-size="12.5">scouts if big or sensitive</text>
   <text class="t plan" x="272" y="242" font-size="11.5" font-weight="700" text-anchor="end">×1–3</text>
   <rect class="chip" x="58" y="260" width="226" height="30" rx="8"/>
   <text class="t" x="72" y="280" font-size="12.5">architect writes the spec</text>
   <rect class="chip" x="58" y="298" width="226" height="30" rx="8"/>
-  <text class="t" x="72" y="318" font-size="12.5">critique if large or risky</text>
+  <text class="t" x="72" y="318" font-size="12.5">critique if big or sensitive</text>
   <line class="ln" x1="58" y1="344" x2="284" y2="344" stroke-opacity="0.5"/>
   <text class="t" x="58" y="367" font-size="13" font-weight="600">OpenSpec change + task board</text>
   <text class="t m" x="58" y="387" font-size="12">nothing is built until you approve</text>

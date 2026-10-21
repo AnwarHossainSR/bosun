@@ -41,7 +41,7 @@ SIZE_WEIGHT = {"S": 1, "M": 2, "L": 3}
 # one context; bigger plans keep the parallel crew. Test and docs tasks fit an implementer, other agents don't.
 SOLO_MAX_TASKS = 8
 SOLO_MAX_UNITS = 16
-SOLO_AGENTS = frozenset({"implementer", "test-engineer", "docs-writer"})
+SOLO_AGENTS = frozenset({"bosun:implementer", "bosun:test-engineer", "bosun:docs-writer"})
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 GLOB_CHARS = "*?["
@@ -289,7 +289,7 @@ def deps_of(task):
 
 
 def agent_of(task) -> str:
-    return str(task.get("agent") or "implementer").strip()
+    return str(task.get("agent") or "").strip() or "implementer"
 
 
 def agent_short(agent: str) -> str:
@@ -499,9 +499,12 @@ def validate_board(board):
         overlap_warnings = overlap_warnings[:MAX_LISTED_WARNINGS] + [f"... and {extra} more overlap warnings"]
     warnings.extend(overlap_warnings)
 
+    solo = isinstance(board.get("meta"), dict) and board["meta"].get("route") == "solo"
     for tid, task in idx.items():
         if status_of(task) in FINISHED | INFLIGHT:
             unfinished = [d for d in deps_of(task) if d in idx and status_of(idx[d]) not in FINISHED]
+            if solo and status_of(task) in INFLIGHT:  # a solo run marks all its tasks in flight together
+                unfinished = [d for d in unfinished if status_of(idx[d]) not in INFLIGHT]
             if unfinished:
                 warnings.append(f"{tid} is {status_of(task)} but its deps {', '.join(unfinished)} are not finished")
     return errors, warnings
@@ -1255,9 +1258,11 @@ def plan_route(board, only=None):
     unfinished ones can't run and are listed as waiting."""
     idx = index_tasks(board)
     wanted = set(only or ()) or None
+    # Tasks in review are built and wait only for their gate, which a resume runs before anything else.
+    review = sorted((k for k, t in idx.items() if status_of(t) == "review"), key=natural_key)
     todo = {k: t for k, t in idx.items()
-            if status_of(t) not in FINISHED | STOPPED and (wanted is None or k in wanted)}
-    done = {k for k, t in idx.items() if status_of(t) in FINISHED}
+            if status_of(t) not in FINISHED | STOPPED | {"review"} and (wanted is None or k in wanted)}
+    done = {k for k, t in idx.items() if status_of(t) in FINISHED} | set(review)
     order, left = [], dict(todo)
     while True:
         ready = [k for k, t in left.items() if all(d in done for d in deps_of(t))]
@@ -1270,7 +1275,7 @@ def plan_route(board, only=None):
     units = sum(size_weight(t) for t in todo.values())
     large = len(todo) > SOLO_MAX_TASKS or units > SOLO_MAX_UNITS
     others = [k for k in sorted(todo, key=natural_key)
-              if agent_short(agent_of(todo[k])) not in SOLO_AGENTS or kind_of(todo[k]) != "code"]
+              if agent_full(agent_of(todo[k])) not in SOLO_AGENTS or kind_of(todo[k]) != "code"]
     reasons = []
     if large:
         reasons.append(f"{len(todo)} tasks and {units} size-units, over the solo limit of "
@@ -1293,6 +1298,7 @@ def plan_route(board, only=None):
         "size_units": units,
         "order": order,
         "waiting": sorted(left, key=natural_key),
+        "in_review": [k for k in review if wanted is None or k in wanted],
         "security_sensitive": [k for k in sorted(todo, key=natural_key) if todo[k].get("security_sensitive")],
         "reasons": reasons,
         "limits": {"tasks": SOLO_MAX_TASKS, "size_units": SOLO_MAX_UNITS},
@@ -1421,6 +1427,8 @@ def cmd_route(args) -> int:
         print(f"security-sensitive: {', '.join(result['security_sensitive'])}")
     if result["waiting"]:
         print(f"waiting (behind blocked, failed or unlisted tasks): {', '.join(result['waiting'])}")
+    if result["in_review"]:
+        print(f"in review (gate and merge these first): {', '.join(result['in_review'])}")
     return 0
 
 
@@ -1711,7 +1719,10 @@ def cmd_status(args) -> int:
     if errors:
         print(f"Board has {len(errors)} validation error(s); run `validate`.")
     else:
-        print(f"Remaining: ~{len(waves)} wave(s) at parallel {parallel}; critical path {critical} size-units"
+        left = sum(len(w) for w in waves)
+        print((f"Remaining: {left} task(s), one solo run in order (progress shows in its task commits)"
+               if meta.get("route") == "solo" else
+               f"Remaining: ~{len(waves)} wave(s) at parallel {parallel}; critical path {critical} size-units")
               + (f"; unschedulable: {', '.join(unschedulable)}" if unschedulable else ""))
     if inflight:
         print("\nIn flight:")

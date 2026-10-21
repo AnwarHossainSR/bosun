@@ -41,9 +41,9 @@ For work that needs many agents but not a product plan.
 
 1. Discover the work items; reading many files for that is a `bosun:scout` job.
 2. Create a board: `TB init <slug> --title "<goal>"`, then `TB add <board> --id … --title … --agent … --files … --deps … --acceptance …`, or write tasks.json following `TB schema`. One task per independent item, the agent per task from the roster, file ownership set, deps where order matters, checkable acceptance criteria for every task.
-3. `TB validate <board>` and `TB waves <board>`.
-4. Show the task count, agents used, the waves at the parallel cap, and what will change. Get a go-ahead before anything writes code; read-only crews (audits, research) can start at once.
-5. Execute with the `bosun:build` skill, passing the board path.
+3. `TB validate <board>` and `TB route <board>` (crew: also `TB waves <board>`).
+4. Show the task count, agents used, the route (solo: one implementer in order, then one review and one merge; crew: the waves at the parallel cap), and what will change. Get a go-ahead before anything writes code; read-only crews (audits, research) can start at once.
+5. Execute with the `bosun:build` skill, passing the board path and the route shown (`--solo` or `--crew`).
 
 ## Roster
 
