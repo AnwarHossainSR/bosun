@@ -127,6 +127,27 @@ class NextTests(unittest.TestCase):
         self.assertEqual((start["A"]["risk"], start["A"]["spec_refs"]), ("high", ["todo-items#Items are private"]))
         self.assertEqual((start["B"]["risk"], start["B"]["spec_refs"]), ("unknown", []))
 
+    def test_only_keeps_unlisted_tasks_out_of_the_slots(self):
+        # ROOT ranks first on the critical path; with --only LONE it must not take the only slot.
+        b = board(task("LONE", files=["z"]), task("ROOT", files=["r"]), task("MID", ["ROOT"], files=["m"]))
+        self.assertEqual([t["id"] for t in tb.plan_next(b, parallel=1)["start"]], ["ROOT"])
+        result = tb.plan_next(b, parallel=1, only=["LONE"])
+        self.assertEqual([t["id"] for t in result["start"]], ["LONE"])
+        self.assertFalse(result["complete"])
+        b = board(task("LONE", files=["z"], status="done"), task("ROOT", files=["r"]))
+        self.assertTrue(tb.plan_next(b, parallel=1, only=["LONE"])["complete"])
+        stuck = tb.plan_next(board(task("ROOT", files=["r"]), task("MID", ["ROOT"], files=["m"])), 1, only=["MID"])
+        self.assertTrue(stuck["stuck"])  # its dependency isn't listed, so it can never start
+
+    def test_only_rejects_unknown_ids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tasks.json"
+            path.write_text(json.dumps(board(task("A", files=["a"]))))
+            proc = subprocess.run([sys.executable, str(SCRIPT), "next", str(path), "--only", "A,ZZ", "--json"],
+                                  capture_output=True, text=True, timeout=30)
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("ZZ", proc.stderr)
+
     def test_json_output_is_one_compact_line(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "tasks.json"

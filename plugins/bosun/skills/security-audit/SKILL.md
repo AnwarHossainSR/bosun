@@ -17,7 +17,7 @@ Scope: $ARGUMENTS
 
 ## 2. Scanners (optional)
 
-Check what's installed (`command -v gitleaks trufflehog semgrep osv-scanner pip-audit govulncheck cargo-audit trivy`, plus the package manager's audit command). Run the relevant ones, each into its own log (`log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; echo "exit $?"; tail -n 40 "$log"`); when the tail doesn't show the findings, grep or read more of that log. Secret scanners print the secrets they find: run them with redaction where the tool supports it (gitleaks: `--redact`), show only their exit status and finding count instead of the tail, and delete every scanner log once the report is written. Keep the output as leads for the reviewers. Install nothing without asking. Note which tools weren't available.
+Check what's installed (`command -v gitleaks trufflehog semgrep osv-scanner pip-audit govulncheck cargo-audit trivy`, plus the package manager's audit command). Run the relevant ones, each into its own log (`set -o pipefail; log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)`); when the tail doesn't show the findings, grep or read more of that log. Secret scanners print the secrets they find: run one only in a mode that redacts them (gitleaks: `--redact`), and skip one that can't, noting it as unsafe to run here; for those, show only the exit status and finding count instead of the tail. Delete every scanner log once the report is written. Keep the output as leads for the reviewers. Install nothing without asking. Note which tools weren't available.
 
 ## 3. Review in parallel
 
@@ -29,7 +29,7 @@ Areas, adjusted to the codebase (skip empty ones):
 
 `--areas` reviews only the listed areas (comma-separated names from the list, such as `--areas auth,input`); tell the user if a name doesn't match one. Without it, every area that applies.
 
-In one message, one `bosun:security-reviewer` per selected area: mode `audit` with `--full`, mode `diff` otherwise (a small diff needs only one or two reviewers in total). Each gets the scope (diff command or paths), its area, the attack-surface map, and the scanner leads (log paths) for its area.
+In one message, spawn the `bosun:security-reviewer` agents, mode `audit` with `--full`, mode `diff` otherwise: one per selected area, or for a small diff one or two in total with every selected area assigned to one of them. Each gets the scope (diff command or paths), its areas, the attack-surface map, and the scanner leads (log paths) for those areas.
 
 ## 4. Verify
 
@@ -41,4 +41,4 @@ Write `.bosun/reviews/<YYYY-MM-DD>-security.md`: overall risk; findings by sever
 
 ## 6. --fix
 
-Fix confirmed findings through `bosun:implementer` (worktree), with a test that proves the fix where feasible. Gate each fix with `bosun:security-reviewer` in `diff` mode, then merge it into the current branch. Never commit directly to the default branch.
+Fix confirmed findings through `bosun:implementer` (worktree), with a test that proves the fix where feasible. Gate each fix with `bosun:security-reviewer` in `diff` mode, show the gated fixes, and merge them into the current branch only after the user's go-ahead. On the default branch, create or ask for a work branch first: never commit directly to the default branch.

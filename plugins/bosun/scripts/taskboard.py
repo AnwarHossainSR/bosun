@@ -1164,14 +1164,17 @@ def tick_tasks_md(board, board_path: Path, wanted) -> None:
 
 # ----------------------------------------------------------------------------- scheduling
 
-def plan_next(board, parallel: int, strict_files: bool = False):
+def plan_next(board, parallel: int, strict_files: bool = False, only=None):
+    """Tasks to start now. `only` limits the candidates (and what counts as pending) to those ids, so unlisted
+    tasks never take the free slots."""
     idx = index_tasks(board)
+    wanted = set(only or ()) or None
     height, ndesc, _ = priorities(idx)
     inflight = [t for t in idx.values() if status_of(t) in INFLIGHT]
     locked = [(f, t["id"]) for t in inflight if kind_of(t) == "code" for f in files_of(t, strict_files)]
     slots = max(0, parallel - len(inflight))
     ready = sorted(
-        (t for t in idx.values() if is_ready(t, idx)),
+        (t for t in idx.values() if is_ready(t, idx) and (wanted is None or t["id"] in wanted)),
         key=lambda t: (-height[t["id"]], -ndesc[t["id"]], natural_key(t["id"])),
     )
     start, deferred = [], []
@@ -1185,7 +1188,7 @@ def plan_next(board, parallel: int, strict_files: bool = False):
             continue
         start.append(task)
         locked.extend((f, task["id"]) for f in files)
-    pending = [t for t in idx.values() if status_of(t) == "pending"]
+    pending = [t for t in idx.values() if status_of(t) == "pending" and (wanted is None or t["id"] in wanted)]
     waiting = [t["id"] for t in pending if not is_ready(t, idx)]
     stopped = [t["id"] for t in idx.values() if status_of(t) in STOPPED]
     return {
@@ -1295,7 +1298,12 @@ def cmd_next(args) -> int:
     board = load_board(path)
     require_valid(board, path)
     parallel = args.parallel or default_parallel(board, path)
-    result = plan_next(board, parallel, args.strict_files)
+    only = [i.strip() for i in (args.only or "").split(",") if i.strip()]
+    unknown = sorted(set(only) - set(index_tasks(board)), key=natural_key)
+    if unknown:
+        print(f"error: --only names unknown task id(s): {', '.join(unknown)}", file=sys.stderr)
+        return 2
+    result = plan_next(board, parallel, args.strict_files, only)
     if args.json:
         emit_json(result)
         return 0
@@ -1786,6 +1794,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = board_cmd("next", "tasks to start now: deps finished, files disjoint from in-flight work, critical path first", cmd_next)
     p.add_argument("--parallel", type=int, help="max tasks in flight (default: meta.max_parallel, config, or 4)")
     p.add_argument("--strict-files", action="store_true", help="code tasks with no declared files run alone")
+    p.add_argument("--only", help="comma-separated task ids: start only these (unlisted tasks never take a slot)")
     p.add_argument("--json", action="store_true")
 
     p = board_cmd("set", "update one or more tasks (status, assignee, branch, worktree, commit, summary, note)", cmd_set)

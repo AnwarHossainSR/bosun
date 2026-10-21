@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - The context injected into bosun agents tells them to run long commands (tests, builds, scanners) into a log and read its tail, and to keep prose before the BOSUN-RESULT block to three lines unless they were asked for a map or a threat model.
 - The guard stops bosun agents other than the architect from running the task board's write commands (`init`, `set`, `add`, `sync`, `meta --set`); the manager is the board's only writer.
 - `TB next --json` includes each task's `risk` and `spec_refs`, so the build's gate can pick its lenses without reading every brief.
+- `TB next --only <ids>` starts only the listed tasks, so `/bosun:build --only` no longer stalls when an unlisted task ranks first.
 
 ### Changed
 - About half the always-on cost: the skill and agent listings that load into every session dropped from about 2,560 to about 1,350 tokens (`claude plugin details bosun` estimates), with shorter descriptions and a shorter style rule in every skill and in the hook.
@@ -28,6 +29,13 @@ All notable changes to this project are documented here. The format follows [Kee
 - Resume marks a task done when its merge landed but the board has no commit for it, and never overwrites `base_commit`, which bounds the final review.
 - The hooks never write through a symbolic link out of the project, never overwrite another agent's saved report, and still log a stop when an agent's message contains malformed Unicode.
 - Every skill and agent description is plain YAML, so strict YAML parsers read the frontmatter too.
+- The log snippet keeps a failing command's exit status (`set -o pipefail`, then `(exit $code)` after the tail), so a failed test or build never looks like success.
+- `/bosun:commit` re-stages files a hook's autofix changed before its one retry, and amends with no remote configured only after you confirm the commit was never pushed.
+- `/bosun:review-pr` fetches a PR from its own repository, creates `.bosun/reviews/` before saving a fallback diff, and reviews that diff when the fetch fails. `/bosun:review` no longer stops on a change made only of untracked files, and `--fix` on a `staged` target checks the index is still the reviewed one.
+- `/bosun:ship` uses the branch's upstream remote instead of assuming `origin`, and takes an existing PR's base before fetching.
+- `/bosun:setup` and `/bosun:build` read only `worktree.baseRef` from Claude Code's settings files, not the rest of them, and setup adds the key with a merge that prints nothing.
+- `/bosun:security-audit` skips secret scanners that can't redact, asks before merging `--fix` results, and assigns every selected area when a small diff gets one or two reviewers.
+- The monitor matches an `in_progress` task to its worktree before calling it lost, and a stale handback marker no longer hides a later stop.
 
 ## [0.3.0] - 2026-10-19
 

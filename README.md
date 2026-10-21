@@ -12,7 +12,7 @@ On a ship, the bosun runs the deck crew. **bosun** runs a crew of Claude Code ag
 
 - **One command for any goal.** `/bosun:manager <goal>` routes features, bugs, refactors, migrations, reviews and audits to the right workflow, and handles small changes without a crew.
 - **Spec-driven plans.** Plans are [OpenSpec](https://github.com/Fission-AI/OpenSpec) changes: requirements with testable scenarios, a design and a checklist. Every task traces back to the requirements it implements, and nothing is built until you approve.
-- **Parallel builds that stay safe.** A task board schedules work by dependencies and file ownership. Each implementer works in its own git worktree, and every task passes a code review (plus a security review when it matters) before it's merged.
+- **Parallel builds that stay safe.** A task board schedules work by dependencies and file ownership. Each implementer works in its own git worktree, and with the default review policy every task passes a code review (plus a security review when it matters) before it's merged.
 - **Findings you can trust.** Reviewers look through different lenses in parallel, and a verifier re-checks every serious finding before you see it.
 - **Lean on tokens.** About 1.4k tokens of always-on context. Agents fetch their own briefs, results go to disk instead of the manager's context, and long logs are read from the tail.
 - **Guard rails built in.** A hook stops bosun's agents from pushing, publishing, rewriting history or editing protected paths. Your own session is never touched.
@@ -90,7 +90,7 @@ Every agent ends with a short `# BOSUN-RESULT` block that the manager acts on.
 
 1. **Schedule.** The task board starts tasks whose dependencies are done and whose files don't overlap work in flight, critical path first, keeping up to `--parallel` agents busy (default 4).
 2. **Build.** Each implementer works in its own git worktree and reads its brief, which quotes the requirements it implements. Tests come first.
-3. **Gate.** Each task gets a code review (correctness, plus spec and tests where they apply) and a security review when it touches sensitive code, then a `--no-ff` merge with fast checks on the merged tree. The full suite runs every few merges; a merge that turns it red is reverted, never reset.
+3. **Gate.** With the default `build.review: task`, each task gets a code review (correctness, plus spec and tests where they apply) and a security review when it touches sensitive code, then a `--no-ff` merge with fast checks on the merged tree. The full suite runs every few merges; a merge that turns it red is reverted, never reset.
 4. **Resume.** The board lives on disk, so `/bosun:build --resume` continues after any interruption.
 5. **Finish.** Full checks, a final review of the whole range, docs and a `SUMMARY.md`. Pushing waits for `/bosun:ship`.
 

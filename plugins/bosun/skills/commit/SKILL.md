@@ -41,9 +41,9 @@ Never print a secret's value; give the file and line.
 
 Show the plan: each commit with its files and full message. Commit after the user approves, or at once with `--yes`. One commit at a time: stage its files, write the message to a temp file, `git commit -F <file>`.
 
-A failing hook: read its output. Fix purely mechanical problems (formatter, lint autofix) and retry once; otherwise stop and report. Never `--no-verify` unless the user explicitly asks.
+A failing hook: read its output. Purely mechanical problems (formatter, lint autofix): re-stage the files the fix changed (`git add -- <paths>`), check `git diff --cached` again, and retry once; otherwise stop and report. Never `--no-verify` unless the user explicitly asks.
 
-`--amend` only when the last commit provably hasn't been pushed. Remote-tracking refs can be stale, so refresh first: `git fetch --quiet <remote>` (the branch's upstream remote, usually `origin`). Fetch fails: refuse, because the remote state can't be established. After a successful fetch, refuse if `git branch -r --contains HEAD` prints anything. No remote configured: nothing can have been pushed, amending is fine. When you refuse, explain why.
+`--amend` only when the last commit provably hasn't been pushed. Remote-tracking refs can be stale, so refresh first: `git fetch --quiet <remote>` (the branch's upstream remote, usually `origin`). Fetch fails: refuse, because the remote state can't be established. After a successful fetch, refuse if `git branch -r --contains HEAD` prints anything. No remote configured: a removed remote can hide an earlier push, so amend only after the user confirms the commit was never pushed. When you refuse, explain why.
 
 ## 7. Finish
 

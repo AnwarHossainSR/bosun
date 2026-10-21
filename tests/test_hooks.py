@@ -116,6 +116,10 @@ class OtherRuleTests(unittest.TestCase):
                          ('python "C:\\Users\\me\\.claude\\plugins\\bosun\\scripts\\taskboard.py" set b.json 1', "set"),
                          (f"env X=1 {tb} set b.json 1 --status done", "set")):
             self.assertEqual(hooks.board_write(cmd), sub, cmd)
+        # Unparseable commands (an unbalanced quote) still get the conservative scan.
+        self.assertEqual(hooks.board_write(f'{tb} meta b.json --set work_branch=x "oops'), "meta")
+        self.assertEqual(hooks.board_write(f'{tb} set b.json 1.1 "oops'), "set")
+        self.assertIsNone(hooks.board_write(f'{tb} meta b.json "oops'))
         for cmd in (f"{tb} brief /r/.bosun/plans/x/tasks.json 2.1", f"{tb} status b.json --json",
                     f"{tb} next b.json --parallel 3 --json", f"{tb} meta b.json", f"{tb} spec-check b.json",
                     "cat taskboard.py", "grep set taskboard.py", "pytest tests/test_set.py"):
@@ -234,7 +238,7 @@ class EventTests(unittest.TestCase):
         self.assertEqual(out["hookEventName"], "SubagentStart")
         self.assertIn("test: pnpm test", out["additionalContext"])
         self.assertIn("Output style: caveman", out["additionalContext"])
-        self.assertIn('echo "exit $?"; tail -n 40', out["additionalContext"])
+        self.assertIn('code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)', out["additionalContext"])
         self.assertNotIn("profile cut to fit", out["additionalContext"])
         log = (self.root / ".bosun" / "activity.jsonl").read_text().splitlines()
         self.assertEqual(json.loads(log[-1])["event"], "start")
@@ -398,6 +402,15 @@ class EventTests(unittest.TestCase):
         self.assertEqual(self.run_hook(stop, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 0)
         self.assertEqual(len(log.read_text().splitlines()), lines)
         self.assertEqual(self.run_hook(stop, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 2)  # no handback this time
+
+    def test_stale_handback_marker_does_not_hide_a_later_stop(self):
+        marker = self.root / ".bosun" / "handbacks" / "a1"
+        marker.parent.mkdir(parents=True)
+        marker.write_text(str(1_000_000_000))  # 2001: its stop never came
+        stop = self.base("SubagentStop", last_assistant_message="no block", stop_hook_active=False)
+        self.assertEqual(self.run_hook(stop, {"BOSUN_ENFORCE_RESULT": "1"}).returncode, 2)
+        self.assertEqual(self.last_entry()["status"], "no-result-block")
+        self.assertFalse(marker.exists())
 
     def test_only_the_architect_may_write_the_board(self):
         cmd = "python3 /p/scripts/taskboard.py set /r/.bosun/plans/x/tasks.json 1.1 --status done"

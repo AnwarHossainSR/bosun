@@ -34,9 +34,11 @@ MAX_CONTEXT_CHARS = 4000
 MAX_SAVED_CHARS = 100_000
 HANDBACK_TOOL = "SubagentHandback"  # newer Claude Code: subagents deliver their report through this tool
 O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)  # not on Windows
-QUIET_RUN = ('- long output (tests, builds, scanners): `log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; '
-             'echo "exit $?"; tail -n 40 "$log"`; read more of the log on a non-zero exit or when the tail reports '
+QUIET_RUN = ('- long output (tests, builds, scanners): `set -o pipefail; log=$(mktemp); echo "log: $log"; '
+             '<cmd> >"$log" 2>&1; code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)` (the last part '
+             'keeps a failure a failure); read more of the log on a non-zero exit or when the tail reports '
              'findings, warnings or skips.')
+HANDBACK_FRESH_SECONDS = 600  # a handback marker older than this is stale: its stop never came
 DANGEROUS_PATHSPECS = {".", "./", ":/", "*", ":(top)", "-A"}
 SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "fish"}
 INTERPRETERS = SHELLS | {"python", "python3", "node", "perl", "ruby", "php", "pwsh", "powershell"}
@@ -567,8 +569,8 @@ def board_write(cmd: str, depth: int = 0):
         return None
     try:
         commands, _, nested = split_commands(cmd)
-    except ValueError:
-        match = re.search(r"taskboard\.py\S*\s+(init|set|add|sync)\b", cmd)
+    except ValueError:  # unparseable: a conservative scan, quotes around the path included
+        match = re.search(r"taskboard\.py['\"]?\s+(init|set|add|sync\b|meta\b(?=.*--set))", cmd)
         return match.group(1) if match else None
     for argv in commands:
         argv = strip_wrappers(argv)
@@ -943,7 +945,9 @@ def handle(data):
         if marker:
             try:
                 os.makedirs(os.path.dirname(marker), exist_ok=True)
-                os.close(os.open(marker, os.O_WRONLY | os.O_CREAT | O_NOFOLLOW, 0o644))
+                fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | O_NOFOLLOW, 0o644)
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write(str(time.time()))
             except OSError:
                 pass
         return 0, "", ""
@@ -951,10 +955,13 @@ def handle(data):
         marker = handback_marker(data)
         if marker and os.path.isfile(marker):
             try:
+                with open(marker, encoding="utf-8") as fh:
+                    fresh = time.time() - float(fh.read().strip() or 0) < HANDBACK_FRESH_SECONDS
                 os.remove(marker)
-            except OSError:
-                pass
-            return 0, "", ""  # its report and stop were recorded at the handback
+            except (OSError, ValueError):
+                fresh = False
+            if fresh:
+                return 0, "", ""  # its report and stop were recorded at the handback
         message = str(data.get("last_assistant_message") or "")
         result = parse_result(message)
         log_event(data, "stop", result, _saved(data, message, result))

@@ -21,13 +21,13 @@ Needs the GitHub CLI: `gh auth status` must succeed; if not, explain `gh auth lo
 
 ## 2. Check out without touching the user's work
 
-`git fetch origin pull/<number>/head:bosun/pr-<number>` (prefix the refspec with `+` to update an existing branch), then `git worktree add .bosun/worktrees/pr-<number> bosun/pr-<number>`. For diffs, `git fetch origin <baseRefName>` and take `git merge-base origin/<baseRefName> bosun/pr-<number>` as the base.
+`<src>` is `origin` for a PR in this repository, else `https://github.com/<owner>/<repo>.git`. `git fetch <src> pull/<number>/head:bosun/pr-<number>` (prefix the refspec with `+` to update an existing branch), then `git worktree add .bosun/worktrees/pr-<number> bosun/pr-<number>`. For diffs, `git fetch <src> <baseRefName>` and at once take `git merge-base FETCH_HEAD bosun/pr-<number>` as the base (note its sha).
 
-Fetch fails (a non-GitHub remote, missing permissions): save `gh pr diff <pr>` to `.bosun/reviews/pr-<number>.diff`, give reviewers that path, and say the review had no full-file context.
+Fetch fails (a non-GitHub remote, missing permissions): `mkdir -p .bosun/reviews`, save `gh pr diff <pr>` to `.bosun/reviews/pr-<number>.diff`, and say the review had no full-file context.
 
 ## 3. Review
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/review/SKILL.md` and follow its steps 3-5 with: diff `git diff <merge-base>...bosun/pr-<number>`; full files from `.bosun/worktrees/pr-<number>`; intent from the PR description and linked issues; CI status as context (failing checks deserve a note even if you don't diagnose them).
+Read `${CLAUDE_PLUGIN_ROOT}/skills/review/SKILL.md` and follow its steps 3-5 with: diff `git diff <merge-base>...bosun/pr-<number>` and full files from `.bosun/worktrees/pr-<number>` (fetch failed: the saved `.bosun/reviews/pr-<number>.diff` as the diff, and no full files); intent from the PR description and linked issues; CI status as context (failing checks deserve a note even if you don't diagnose them).
 
 ## 4. Draft
 

@@ -49,7 +49,7 @@ In worktree mode every implementer works in its own git worktree. By default Cla
 { "worktree": { "baseRef": "head" } }
 ```
 
-Check `.claude/settings.local.json`, `.claude/settings.json` and `~/.claude/settings.json` for `worktree.baseRef`. None sets it to `"head"`: offer to merge it into `.claude/settings.local.json` (personal, not committed), preserving every existing key. Tell the user to start a new session afterwards to be safe; whether a running session picks the change up is not documented.
+Read only that one setting, never the rest of those files (they can hold permissions and personal settings): `grep -o '"baseRef" *: *"[^"]*"' .claude/settings.local.json .claude/settings.json ~/.claude/settings.json 2>/dev/null`. None sets it to `"head"`: offer to add it to `.claude/settings.local.json` (personal, not committed) with a merge that keeps every other key and prints nothing: `python3 -c 'import json, os; p = ".claude/settings.local.json"; d = json.load(open(p)) if os.path.exists(p) else {}; d.setdefault("worktree", {})["baseRef"] = "head"; os.makedirs(".claude", exist_ok=True); json.dump(d, open(p, "w"), indent=2)'`. Tell the user to start a new session afterward to be safe; whether a running session picks the change up is not documented.
 
 ## 5. Worktree environment
 

@@ -10,7 +10,7 @@ Problem: $ARGUMENTS
 
 **Style:** `output_style` in `.bosun/config.json` (default `caveman`): your prose and agent prompts terse, no filler; code, commands, paths, errors, numbers and quotes exact; keep logic words (because, so, but, not, only, can, may, must); full sentences for warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty; never drop a fact or an uncertainty label. Commits, PR text, docs and specs: normal prose. `normal` turns it off.
 
-Long command output goes to a log you tail: `log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; echo "exit $?"; tail -n 40 "$log"`. If the tail doesn't show the cause (the first error, the top of a traceback), grep or read more of that log. When `.bosun/` exists, agents' final messages are also saved in `.bosun/results/`.
+Long command output goes to a log you tail: `set -o pipefail; log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)`. If the tail doesn't show the cause (the first error, the top of a traceback), grep or read more of that log. When `.bosun/` exists, agents' final messages are also saved in `.bosun/results/`.
 
 ## 1. Frame the problem
 
