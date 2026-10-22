@@ -348,7 +348,9 @@ class CliTests(unittest.TestCase):
         self.run_tb("meta", "demo", "--set", "route=solo")
         out = self.run_tb("validate", "demo").stdout
         self.assertNotIn("in_progress but its deps", out)  # a solo run marks its tasks in flight together
-        self.assertIn("one solo run in order", self.run_tb("status", "demo").stdout)
+        self.assertIn("Remaining: 6 task(s) to build in one solo run, in order (", self.run_tb("status", "demo").stdout)
+        self.run_tb("set", "demo", "T01", "--status", "review")  # built, waiting for its gate: not counted as left to build
+        self.assertIn("Remaining: 5 task(s) to build in one solo run, in order, 1 in review", self.run_tb("status", "demo").stdout)
 
     def test_route_text_outcomes(self):
         self.run_tb("set", "demo", "T01", "--status", "blocked")

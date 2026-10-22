@@ -1719,9 +1719,11 @@ def cmd_status(args) -> int:
     if errors:
         print(f"Board has {len(errors)} validation error(s); run `validate`.")
     else:
-        left = sum(len(w) for w in waves)
-        print((f"Remaining: {left} task(s), one solo run in order (progress shows in its task commits)"
-               if meta.get("route") == "solo" else
+        solo = plan_route(board) if meta.get("route") == "solo" else None  # counts what is left to build, as route does
+        print((f"Remaining: {solo['tasks']} task(s) to build in one solo run, in order"
+               + (f", {len(solo['in_review'])} in review" if solo["in_review"] else "")
+               + " (progress shows in its task commits)"
+               if solo else
                f"Remaining: ~{len(waves)} wave(s) at parallel {parallel}; critical path {critical} size-units")
               + (f"; unschedulable: {', '.join(unschedulable)}" if unschedulable else ""))
     if inflight:

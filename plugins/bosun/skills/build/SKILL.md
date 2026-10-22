@@ -57,7 +57,7 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
    - Integration check: the full checks.
    - Record: step 8 with every id and the commit message `bosun(<ids, comma-separated>): <plan title>`; then `TB set <board> <ID> --summary "<its tasks summary>"` per task.
    - Clean up: every worktree and branch of the run (each continuation's supersedes the earlier ones).
-4. **Then:** tasks pending again or added meanwhile (follow-ups via `TB add`): `TB route` for them, `TB meta <board> --set route=<route>`, and run them on that route. Section 4 starts only when nothing is pending.
+4. **Then:** tasks pending again or added meanwhile (follow-ups via `TB add`): `TB route` for them, `TB meta <board> --set route=<route>`, and run them on that route. With `--only`, pass it on: unlisted tasks, follow-ups included, wait for a later build, as on the crew route. Section 4 starts only when nothing is pending (with `--only`: nothing listed).
 
 **Crew route** (rolling pool), until nothing is pending or in flight:
 
