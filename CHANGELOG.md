@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-22
+
+### Fixed
+- `TB status` on a solo board counts only the tasks the solo run will build. Tasks waiting behind a blocked one show once, as unschedulable, and tasks in review show separately.
+- `/bosun:build --only`: tasks added to finish the listed work (a split, a fix for a critical or high finding) join the list. Finish starts when no listed task is pending, and its final review, tasks.md check and report cover the listed tasks and name the ones left.
+- `/bosun:plan` with `--solo` or `--no-critique`: when a revision adds security-sensitive tasks, the approval names those no threat model covered, and says when a large board had no critique, before asking.
+
 ## [0.5.0] - 2026-10-21
 
 ### Added
