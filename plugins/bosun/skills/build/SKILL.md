@@ -1,14 +1,14 @@
 ---
 name: build
-description: Run a bosun plan with parallel agents in git worktrees, with review-gated merges, tasks.md kept in step and resume. Use after /bosun:plan, for a task board, or to resume a build.
-argument-hint: "[change-id|plan-slug|board-path] [--parallel N] [--isolation worktree|shared] [--review task|batch|final] [--resume] [--only 1.1,2.3] [--dry-run]"
+description: Run a bosun plan, solo or with parallel agents in git worktrees, with review-gated merges, tasks.md kept in step and resume. Use after /bosun:plan, for a task board, or to resume a build.
+argument-hint: "[change-id|plan-slug|board-path] [--solo|--crew] [--parallel N] [--isolation worktree|shared] [--review task|batch|final] [--resume] [--only 1.1,2.3] [--dry-run]"
 ---
 
 # bosun build
 
 Arguments: $ARGUMENTS
 
-TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python3` is missing). The board (tasks.json) is the source of truth and **you are its only writer**; subagents never edit it. Prefer one TB call with several ids. Edge cases (shared mode, conflicts, resume, review policies): [reference/execution.md](reference/execution.md), read the section you need.
+TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python3` is missing). The board (tasks.json) is the source of truth and **you are its only writer**; subagents never edit it. Prefer one TB call with several ids. Edge cases (shared mode, conflicts, resume, review policies, agent teams): [reference/execution.md](reference/execution.md), read the section you need.
 
 **Style:** `output_style` in `.bosun/config.json` (default `caveman`): your prose and agent prompts terse, no filler; code, commands, paths, errors, numbers and quotes exact; keep logic words (because, so, but, not, only, can, may, must); full sentences for warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty; never drop a fact or an uncertainty label. Commits, PR text, docs and specs: normal prose. `normal` turns it off.
 
@@ -22,6 +22,7 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
 
 1. **Board:** the argument (change id, slug, directory or path), else `TB latest`. `TB validate <board>`; OpenSpec plan: also `TB spec-check <board>` and, with the CLI (from the OpenSpec directory's parent), `OPENSPEC_TELEMETRY=0 openspec validate <id> --strict --no-interactive`. Errors mean stop.
 2. **Settings:** `.bosun/config.json`; defaults when absent: `build.max_parallel` 4, `isolation` worktree, `review` task, `security_review` sensitive, `max_attempts` 2, `merge` merge. Flags override. Note `commands` (install, test, lint, typecheck, build).
+   **Route:** `TB route <board> --json` (pass `--only` on): `solo`, one implementer for the tasks in `order`, then one review and one merge; or `crew`, parallel agents (`reasons` says why). `--crew` forces the crew, `--solo` solo when `solo_ok` is true (otherwise say why and use the crew). Solo needs worktree mode; shared mode uses the crew. Resuming with tasks `in_progress` or `review`: the route stays `meta.route` (unset: crew) whatever the flags; tasks in review (`in_review`) are left out of `order`, because their gates come first (step 4). `stuck` or `none`: still do steps 3 and 4, then section 3 or 4.
 3. **Git** (worktree mode):
    - Clean working tree apart from ignored files, `.bosun/` and (OpenSpec plan) the uncommitted plan files: the change directory, plus `<openspec_dir>/config.yaml` if the plan created it. Otherwise ask the user to commit or stash first; never stash for them. One exception, an unfinished merge (`git rev-parse -q --verify MERGE_HEAD` succeeds, or after a squash the file at `git rev-parse --git-path SQUASH_MSG` exists): its staged and conflicted paths (`git diff --name-only --diff-filter=U`) are step 4's. Don't ask to commit or stash them (committing skips the integration check, stashing drops the merge, and with conflicts git refuses both). Anything else in the tree still counts.
    - Work branch: `meta.work_branch` set and not current (`git branch --show-current`): switch to it. During an unfinished merge never switch or check out a branch and never run `git merge --quit` (`git checkout` of the current branch silently drops the merge state); HEAD not the work branch then: stop and ask. No work branch yet: on the default branch create `bosun/<plan-name>`, on another branch use it, and record it once: `TB meta <board> --set work_branch=<b> --set base_branch=<default> --set base_commit=<sha> --set isolation=<mode> --set max_parallel=<N>`. On resume never overwrite `base_commit`: it bounds the final review.
@@ -29,12 +30,36 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
    - OpenSpec plan with uncommitted plan files (*local: skip*): commit them on the work branch now (`git add -- <those paths>`, then `git commit -m "docs(spec): propose <id>"` in the repository's commit style). Worktrees hold only committed files, and implementers read the specs there.
    - Worktree base: subagent worktrees must branch from the current HEAD, not the default branch, or tasks miss the dependencies merged before them. Check only that setting, never the rest of those files: `grep -o '"baseRef" *: *"[^"]*"' .claude/settings.local.json .claude/settings.json ~/.claude/settings.json 2>/dev/null`. Not `"head"`: explain, and offer to add it as `/bosun:setup` does and restart the session, or to continue in shared mode.
    - Not a git repository: shared mode.
-4. **Resume** (`--resume`, tasks already `in_progress` or `review`, or an unfinished merge from step 3): agents from the earlier session are gone. Read the reference, section "Resume", and decide now for each task and the merge. After step 5's go-ahead, settle an unfinished merge first, before any other resume action (gates, commits, `TB sync`, dispatch); a merge left to the user: start nothing until it's settled (`git rev-parse -q --verify MERGE_HEAD` fails, `SQUASH_MSG` is gone, `git diff --cached --quiet` passes). Then reset tasks with no work (`TB set <board> <ids> --status pending --note "reset on resume"`), and for an OpenSpec plan whose tasks.md `TB status` reports out of sync, run `TB sync <board>` and commit tasks.md (*local: skip the commit*).
-5. **Confirm:** tasks remaining, resume decisions (including an unfinished merge, worktrees no task claimed, uncommitted paths outside a task), the `TB waves <board> --parallel <N>` summary, parallelism, isolation, review policy, work branch. Get a go-ahead before starting any agent unless the user already approved this build; an unfinished merge always needs one. `--dry-run`: also print the first wave's prompt and `TB brief` for one of its tasks, then stop.
+4. **Resume** (`--resume`, tasks already `in_progress` or `review`, or an unfinished merge from step 3): agents from the earlier session are gone. Read the reference, section "Resume", and decide now for each task and the merge. After step 5's go-ahead, settle an unfinished merge first, before any other resume action (gates, commits, `TB sync`, dispatch); a merge left to the user: start nothing until it's settled (`git rev-parse -q --verify MERGE_HEAD` fails, `SQUASH_MSG` is gone, `git diff --cached --quiet` passes). Then reset tasks with no work (`TB set <board> <ids> --status pending --note "reset on resume"`; a solo run's tasks it never reached stay `in_progress`: reference), and for an OpenSpec plan whose tasks.md `TB status` reports out of sync, run `TB sync <board>` and commit tasks.md (*local: skip the commit*).
+5. **Confirm:** tasks remaining, resume decisions (including an unfinished merge, worktrees no task claimed, uncommitted paths outside a task), the route (solo: its order; crew: the `TB waves <board> --parallel <N>` summary and parallelism), isolation, review policy, work branch. Get a go-ahead before starting any agent unless the user already approved this build; an unfinished merge always needs one. `--dry-run`: also print the first prompt (crew: the first wave's) and `TB brief` for one of its tasks, then stop. Otherwise record the route: `TB meta <board> --set route=<solo|crew>` (briefs and the monitor read it).
 
-## 1. Scheduling loop (rolling pool)
+## 1. Run the tasks
 
-Until nothing is pending or in flight:
+**Solo route** (worktree mode): no scheduling; one implementer works through `order`.
+
+1. `TB set <board> <ids in order> --status in_progress --assignee bosun:implementer`, then one Agent call: `bosun:implementer`, `isolation: "worktree"`, `name` `solo` (continuations `solo-2`, `solo-3`), `description` "<n> tasks solo", and this prompt:
+
+   ```
+   Tasks <ID>, <ID>, ... of bosun plan "<plan title>", solo: one at a time, in this order. Before each, read its brief: <TB> brief <absolute board path> <ID>
+   Mode: worktree: your own git worktree on your own branch, created from the work branch "<work_branch>". Commit each task on its own there. Never push.
+   Main checkout (read-only reference): <absolute path>
+   <no docs task in the plan: last, update the docs the change affects (README, CHANGELOG if the project keeps one) in a `docs: <summary>` commit>
+   <continuation only: First run `git merge <branch>`: it holds tasks <ids>, done<, and `wip(<ID>)` work to finish first>.>
+   ```
+2. **Result:** `tasks` gives each task's status and commit (`wip(<ID>)` commits are unfinished work); collect `spec_gaps` as section 2, step 1 says.
+   - `needs_input`: ask the user (an answer that changes the spec: section 3 first), then SendMessage (`to` = its name) the answer.
+   - Tasks it didn't reach because it stopped to keep its context fresh: a continuation, a new solo implementer for them with the continuation line (not SendMessage: its context is full).
+   - A task `partial`, `failed` or `blocked`, no result block, or an agent that can't be resumed: the result's `tasks` (else the branch's `<type>(<ID>): ...` commits, never `wip`) show what's done, and section 3 handles the rest; a retry there is a continuation. A task left blocked: `TB route <board> --json` again, and continue with the tasks in its `order` that aren't done; those in `waiting` wait for the user.
+   - Tasks it never reached stay `in_progress` (no `TB set`), so a continuation doesn't count an attempt for them.
+3. **Review and merge once,** when every task of the run is done, skipped, blocked or waiting on one: section 2 from step 2, where `<ID>` is every task reported `done` and the task branch is the run's latest branch (if `wip` commits follow the last done task's commit: `git branch <branch>-done <that commit>`, and use that). The differences:
+   - Gate: it is also the final review, so whatever the review policy its lenses are correctness and tests, `spec` for an OpenSpec plan and `design` above about 300 changed lines (step 3's size and security-reviewer rules apply).
+   - Fix rounds: two for the run, and a red integration check counts as one (undo the merge, never send the run's tasks back to pending). Each re-runs the reviewers that blocked, plus the security-reviewer if the gate had one. Still blocking after two: the tasks the open findings concern go to section 3 as blocked, and nothing merges until the user decides.
+   - Integration check: the full checks.
+   - Record: step 8 with every id and the commit message `bosun(<ids, comma-separated>): <plan title>`; then `TB set <board> <ID> --summary "<its tasks summary>"` per task.
+   - Clean up: every worktree and branch of the run (each continuation's supersedes the earlier ones).
+4. **Then:** tasks pending again or added meanwhile (follow-ups via `TB add`): `TB route` for them, `TB meta <board> --set route=<route>`, and run them on that route. With `--only`, pass it on: unlisted tasks, follow-ups included, wait for a later build, as on the crew route. Section 4 starts only when nothing is pending (with `--only`: nothing listed).
+
+**Crew route** (rolling pool), until nothing is pending or in flight:
 
 1. `TB next <board> --parallel <N> --json` (shared mode: add `--strict-files`): tasks whose deps are finished and whose files don't overlap work in flight, critical path first; keep each task's agent, kind, risk, spec_refs and security_sensitive for its gate. With `--only`, pass it on (`--only 1.1,2.3`): unlisted tasks then never take a slot, and the loop ends once the listed ones are finished. `stuck: true`: section 3.
 2. Mark the tasks to start in one call: `TB set <board> <ids...> --status in_progress --assignee <agent>`.
@@ -82,10 +107,10 @@ Report tasks (`kind: report`) aren't merged: mark the task done with a one-line 
 
 When the board is complete, or only blocked and skipped tasks remain:
 
-1. Run the full checks yourself: install, lint, typecheck, test, build.
+1. Run the full checks yourself: install, lint, typecheck, test, build. Solo route: skip this step and the next when the run's integration check and gate (section 1, solo step 3) covered every merge since `<base_commit>`; they were these steps (the gate's security-reviewer stands in for the audit).
 2. Final review: the `bosun:review` skill on `<base_commit>...HEAD` with lenses correctness, design and tests, plus `spec` for an OpenSpec plan (every requirement in the change against the code and its tests). Any task security-sensitive: also `bosun:security-audit` on the same range.
 3. Fix critical and high findings through the same pipeline (new tasks via `TB add`).
 4. OpenSpec plan: `TB spec-check <board>` clean and every task line in tasks.md ticked. Skipped tasks stay unticked: ask whether to drop them from the change (architect, revise mode) or finish them. With the CLI, `openspec validate <id> --strict --no-interactive` once more, from the OpenSpec directory's parent.
-5. No docs task in the plan: spawn `bosun:docs-writer` for the README and CHANGELOG.
+5. No docs task in the plan, and no solo run that updated them: spawn `bosun:docs-writer` for the README and CHANGELOG.
 6. Write `.bosun/plans/<name>/SUMMARY.md` from the board, `.bosun/plans/<name>/results/` (several files for one task are retries or reviews; the newest is the latest) and your notes: what was delivered (per requirement for an OpenSpec plan), deviations from the plan, spec gaps the agents reported, decisions made along the way, follow-ups, known issues, how to run it.
 7. Tell the user the outcome in a few lines, separating what you verified from what you didn't. Next: `/bosun:ship` pushes and opens the PR (never push yourself); OpenSpec plan: `/bosun:archive <id>` merges the change into `<openspec_dir>/specs/`. Archiving on the work branch before shipping lets the PR carry the updated specs; some teams archive after review instead. A local OpenSpec directory never reaches the PR.

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" role="img" aria-labelledby="title desc">
   <title id="title">How bosun works</title>
-  <desc id="desc">You give the bosun manager a goal. It picks the lightest workflow and runs specialist agents in parallel: plan (scouts, architect, threat model, your approval), build (implementers in their own git worktrees, review gates, merge), review (lens reviewers and a verifier) and ship (final checks and a pull request). Investigation, security audit, PR review, status and commits are also available.</desc>
+  <desc id="desc">You give the bosun manager a goal. It picks the lightest workflow and runs specialist agents sized to the work: plan (an architect, with scouts and a critique and threat model when the work is large or security-sensitive, then your approval), build (one implementer task by task for a small plan, or implementers in parallel git worktrees for a big one, with review gates before merging), review (lens reviewers and a verifier) and ship (final checks and a pull request). Investigation, security audit, PR review, status and commits are also available.</desc>
   <style>
     .bg { fill: #ffffff; stroke: #d0d7de; }
     .card { fill: #f6f8fa; stroke: #d0d7de; }
@@ -69,12 +69,12 @@
   <rect class="stack plan-s" x="64" y="214" width="226" height="30" rx="8"/>
   <rect class="stack plan-s" x="61" y="218" width="226" height="30" rx="8"/>
   <rect class="chip" x="58" y="222" width="226" height="30" rx="8"/>
-  <text class="t" x="72" y="242" font-size="12.5">scouts map the code</text>
-  <text class="t plan" x="272" y="242" font-size="11.5" font-weight="700" text-anchor="end">×3</text>
+  <text class="t" x="72" y="242" font-size="12.5">scouts if big or sensitive</text>
+  <text class="t plan" x="272" y="242" font-size="11.5" font-weight="700" text-anchor="end">×1–3</text>
   <rect class="chip" x="58" y="260" width="226" height="30" rx="8"/>
   <text class="t" x="72" y="280" font-size="12.5">architect writes the spec</text>
   <rect class="chip" x="58" y="298" width="226" height="30" rx="8"/>
-  <text class="t" x="72" y="318" font-size="12.5">critique + threat model</text>
+  <text class="t" x="72" y="318" font-size="12.5">critique if big or sensitive</text>
   <line class="ln" x1="58" y1="344" x2="284" y2="344" stroke-opacity="0.5"/>
   <text class="t" x="58" y="367" font-size="13" font-weight="600">OpenSpec change + task board</text>
   <text class="t m" x="58" y="387" font-size="12">nothing is built until you approve</text>
@@ -86,18 +86,18 @@
   <circle class="build-bg build-s" cx="356" cy="172" r="15" stroke-width="1.5"/>
   <text class="t build" x="356" y="177" font-size="14" font-weight="700" text-anchor="middle">2</text>
   <text class="t build" x="380" y="177" font-size="14" font-weight="700" letter-spacing="1.4">BUILD</text>
-  <text class="t m" x="344" y="207" font-size="12.5">many agents, one git worktree each</text>
+  <text class="t m" x="344" y="207" font-size="12.5">solo or a crew, sized to the plan</text>
   <rect class="stack build-s" x="350" y="214" width="226" height="30" rx="8"/>
   <rect class="stack build-s" x="347" y="218" width="226" height="30" rx="8"/>
   <rect class="chip" x="344" y="222" width="226" height="30" rx="8"/>
   <text class="t" x="358" y="242" font-size="12.5">implementers, tests first</text>
-  <text class="t build" x="558" y="242" font-size="11.5" font-weight="700" text-anchor="end">×N</text>
+  <text class="t build" x="558" y="242" font-size="11.5" font-weight="700" text-anchor="end">×1–N</text>
   <rect class="chip" x="344" y="260" width="226" height="30" rx="8"/>
   <text class="t" x="358" y="280" font-size="12.5">code + security review gate</text>
   <rect class="chip" x="344" y="298" width="226" height="30" rx="8"/>
   <text class="t" x="358" y="318" font-size="12.5">verifier double-checks</text>
   <line class="ln" x1="344" y1="344" x2="570" y2="344" stroke-opacity="0.5"/>
-  <text class="t" x="344" y="367" font-size="13" font-weight="600">merged task by task</text>
+  <text class="t" x="344" y="367" font-size="13" font-weight="600">merged after review</text>
   <text class="t m" x="344" y="387" font-size="12">tasks.md ticked, resumable any time</text>
 
   <path class="chev" d="M 595 262 L 604 271 L 595 280"/>

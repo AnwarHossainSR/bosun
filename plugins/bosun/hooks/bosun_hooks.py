@@ -717,7 +717,14 @@ def parse_result(message: str):
 
 
 def _slug(text, limit=40):
-    return re.sub(r"[^A-Za-z0-9._-]+", "-", str(text or "")).strip("-.")[:limit]
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", str(text or "")).strip("-.")[:limit].strip("-.")
+
+
+def _task_label(task):
+    """A solo run's result names all its task ids; past the slug limit, keep the first, the last and the count."""
+    ids = [i for i in re.split(r"[\s,]+", str(task or "")) if i]
+    joined = "-".join(ids)
+    return joined if len(ids) < 2 or len(_slug(joined, 1000)) <= 40 else f"{ids[0]}-to-{ids[-1]}-{len(ids)}-tasks"
 
 
 def inside_without_links(root, path) -> bool:
@@ -758,7 +765,7 @@ def save_result(data, message: str, result):
     if not root or not message.strip():
         return None
     parts = [time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()), _slug(str(data.get("agent_type") or "").split(":")[-1]),
-             _slug((result or {}).get("task")), _slug(data.get("agent_id"))[:8]]
+             _slug(_task_label((result or {}).get("task"))), _slug(data.get("agent_id"))[:8]]
     base = "-".join(p for p in parts if p)
     cut = len(message) - MAX_SAVED_CHARS
     text = f"[bosun: first {cut} characters cut]\n{message[-MAX_SAVED_CHARS:]}" if cut > 0 else message
@@ -968,7 +975,8 @@ def handle(data):
         if result is None and not data.get("stop_hook_active") \
                 and os.environ.get("BOSUN_ENFORCE_RESULT", "0") == "1":
             return 2, "", (f"End your final message with the {RESULT_MARKER} block from your instructions. "
-                           "If you could not finish, report status blocked or failed and say why.")
+                           "If you could not finish, report status partial, blocked or failed and say why; a solo "
+                           "run lists every task under tasks (not-started for those you didn't reach).")
         return 0, "", ""
     return 0, "", ""
 

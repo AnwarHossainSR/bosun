@@ -8,7 +8,7 @@
     {
       "name": "bosun",
       "source": "./plugins/bosun",
-      "description": "Manager skill + 10 specialist agents for spec-driven planning (OpenSpec format), parallel building, reviewing, security auditing, investigating, committing and shipping."
+      "description": "Manager skill + 10 specialist agents for spec-driven planning (OpenSpec format), building solo or in parallel, reviewing, security auditing, investigating, committing and shipping."
     }
   ]
 }

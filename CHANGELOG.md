@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-21
+
+### Added
+- Solo builds. `/bosun:build` now gives a small or medium plan to one implementer, which works through the tasks in tasks.md order in one worktree with a commit per task. The whole run then gets one review and one merge, and that review counts as the final review. "Small or medium" means up to 8 tasks and 16 size-units, all of them code tasks for bosun's implementer, test-engineer or docs-writer, in worktree mode. Bigger plans, plans with a task for another agent and shared-mode builds keep the parallel crew, and `--crew` or `--solo` picks the route yourself (`--solo` when no task needs its own agent).
+- A solo run that stops early continues from its commits with a fresh implementer, and SendMessage is used only for answers and fix rounds. Unfinished work is committed as `wip(<ID>)` and never counts as done, and a merge never takes it along. Tasks the run didn't reach keep their attempts. Fix rounds are counted for the whole run, a red integration check is one of them, and the security reviewer re-checks every fix.
+- `TB route <board>` chooses between solo and crew. It gives the solo order (task ids wherever the deps allow it, so tasks.md order), the security-sensitive tasks, the tasks waiting on blocked ones, those in review, and its reasons. It takes `--only` and `--json` like `next`. The build records the route on the board as `meta.route`, and a resumed build keeps it.
+- Lean plans. `/bosun:plan` has the architect plan small and medium work alone: it reads the code the change touches, researches open questions itself and keeps the board within the solo limits, with no scouts and no critique round. Work judged large or security-sensitive at intake gets scouts, the architect's critique and a threat model. A lean plan whose finished or revised board turns out large or security-sensitive gets the critique and threat model. `--solo` or `--crew` picks the path yourself and carries over to the build.
+
+### Changed
+- In a solo run, task briefs drop the "in flight right now" section (it would have listed the implementer's own later tasks as off-limits) and mark dependencies as done earlier in the run, and `TB validate` doesn't warn about the run's tasks being in flight together.
+- The implementer's result block lists each task of a solo run with its status, commit and summary, and the board gets each task's summary. `TB status` and `/bosun:status` show the route and a solo run's progress, and the monitor counts a solo run as one agent and judges it by its task commits.
+- The plan's approval summary shows the build route, with waves and the critical path only for a crew build. The manager's ad-hoc crews show the route before you approve them.
+- The security reviewer runs secret scanners only in a mode that redacts what they find, as `/bosun:security-audit` already did.
+- The hook saves a long solo run's report as `...-<first id>-to-<last id>-<n>-tasks-...`, and its `BOSUN_ENFORCE_RESULT` reminder allows `partial`.
+
+### Fixed
+- With agent teams enabled, the build leaves `name` off every agent it starts without `isolation` (shared-mode tasks as well as report tasks), so they all start as subagents.
+- A task whose `agent` is blank is treated as the implementer's, as when the field is missing.
+
 ## [0.4.0] - 2026-10-21
 
 ### Added
