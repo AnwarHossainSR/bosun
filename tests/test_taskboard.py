@@ -351,6 +351,11 @@ class CliTests(unittest.TestCase):
         self.assertIn("Remaining: 6 task(s) to build in one solo run, in order (", self.run_tb("status", "demo").stdout)
         self.run_tb("set", "demo", "T01", "--status", "review")  # built, waiting for its gate: not counted as left to build
         self.assertIn("Remaining: 5 task(s) to build in one solo run, in order, 1 in review", self.run_tb("status", "demo").stdout)
+        self.run_tb("set", "demo", "T01", "T02", "--status", "done")
+        self.run_tb("set", "demo", "T03", "--status", "blocked")
+        out = self.run_tb("status", "demo").stdout
+        self.assertIn("Remaining: 1 task(s) to build in one solo run, in order (", out)  # T04; T05 and T06 wait on T03
+        self.assertIn("unschedulable: T05, T06", out)
 
     def test_route_text_outcomes(self):
         self.run_tb("set", "demo", "T01", "--status", "blocked")

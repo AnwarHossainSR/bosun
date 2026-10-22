@@ -57,7 +57,7 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
    - Integration check: the full checks.
    - Record: step 8 with every id and the commit message `bosun(<ids, comma-separated>): <plan title>`; then `TB set <board> <ID> --summary "<its tasks summary>"` per task.
    - Clean up: every worktree and branch of the run (each continuation's supersedes the earlier ones).
-4. **Then:** tasks pending again or added meanwhile (follow-ups via `TB add`): `TB route` for them, `TB meta <board> --set route=<route>`, and run them on that route. With `--only`, pass it on: unlisted tasks, follow-ups included, wait for a later build, as on the crew route. Section 4 starts only when nothing is pending (with `--only`: nothing listed).
+4. **Then:** tasks pending again or added meanwhile (follow-ups via `TB add`): `TB route` for them, `TB meta <board> --set route=<route>`, and run them on that route. With `--only`, pass it on, adding the ids of tasks added to finish listed work (a split, a fix for a critical or high finding); other unlisted tasks, medium follow-ups included, wait for a later build, as on the crew route. Section 4 starts only when nothing is pending (with `--only`: no listed task is).
 
 **Crew route** (rolling pool), until nothing is pending or in flight:
 
@@ -105,7 +105,7 @@ Report tasks (`kind: report`) aren't merged: mark the task done with a one-line 
 
 ## 4. Finish
 
-When the board is complete, or only blocked and skipped tasks remain:
+When the board is complete, or only blocked and skipped tasks remain (with `--only`: of the listed tasks; steps 2 and 4 then cover only those and their requirements, and step 7 names the tasks left for a later build):
 
 1. Run the full checks yourself: install, lint, typecheck, test, build. Solo route: skip this step and the next when the run's integration check and gate (section 1, solo step 3) covered every merge since `<base_commit>`; they were these steps (the gate's security-reviewer stands in for the audit).
 2. Final review: the `bosun:review` skill on `<base_commit>...HEAD` with lenses correctness, design and tests, plus `spec` for an OpenSpec plan (every requirement in the change against the code and its tests). Any task security-sensitive: also `bosun:security-audit` on the same range.
