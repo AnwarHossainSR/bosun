@@ -20,7 +20,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Reviews always leave lockfiles and files marked `linguist-generated` out of their size and of the reviewers' diffs, including lockfiles in monorepo subfolders. A changed lockfile adds the security lens, and one security reviewer gets those files alone, for supply-chain checks. `/bosun:review-pr` and the build's review gates do the same.
   - This used to depend on the session. In one run on a pull request whose `pnpm-lock.yaml` was 1,379 of 1,849 added lines, it kept the lockfile away from three reviewers on its own.
 - Reviewers and verifiers no longer install dependencies, use on-demand runners such as `npx` or `uv run`, or copy the repository. A check that needs more is reported as not run. When an install matters, it happens once, with the lockfile frozen.
-- `/bosun:review-pr` runs a PR's code (installs, tests, scripts) only for a same-repository PR that doesn't change dependencies. For a fork, or a dependency change, it asks first; without a yes, its agents only read files.
+- `/bosun:review-pr` asks you once before running a PR's code (installs, tests, scripts). It recommends yes only for a same-repository PR that doesn't change dependencies, and without a yes its agents only read files.
 
 ## [0.5.1] - 2026-10-22
 
