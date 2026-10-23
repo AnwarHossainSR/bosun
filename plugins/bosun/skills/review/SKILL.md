@@ -10,12 +10,14 @@ Target: $ARGUMENTS
 
 **Style:** `output_style` in `.bosun/config.json` (default `caveman`): your prose and agent prompts terse, no filler; code, commands, paths, errors, numbers and quotes exact; keep logic words (because, so, but, not, only, can, may, must); full sentences for warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty; never drop a fact or an uncertainty label. Commits, PR text, docs and specs: normal prose. `normal` turns it off.
 
+**Tokens:** first run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py"` `start` and keep its `mark`; the report ends with the lines `usage.py report --since <mark>` prints (this run, the session, the context left; plan limits are in `/usage`).
+
 ## 1. Resolve the target
 
 - **Default**: everything on this branch that isn't in its base, plus uncommitted work. Base ref: `origin/<default branch>` if it exists, else the local default branch. Merge base: `git merge-base HEAD <base ref>`; the diff is `git diff <merge-base>` (committed and uncommitted changes against it), plus untracked files from `git ls-files --others --exclude-standard`.
 - `staged`: `git diff --cached`. `working`: `git diff HEAD` plus untracked files. `A...B`: `git diff A...B`. A single commit: `git show <sha>`.
 
-Show the `--stat`. Nothing to review (an empty stat and, for the default target and `working`, no untracked files from `git ls-files --others --exclude-standard`): say so and stop. Size = `--shortstat` plus the lines of untracked files in the target. Under about 300 changed lines, read the diff yourself to pick lenses. Larger: read only the stat and file list, never the whole diff (the reviewers read it, and a large diff would fill your context and delay them). Content triggers (`security` above all, also `performance` and `api-compat`) need the content: list matching files with the target's diff command plus `--name-only -G'<trigger regex>'` (untracked files: `grep -lE '<trigger regex>' <files>`), or open those files' diffs. Unsure whether `security` applies: include it.
+Show the `--stat`. Nothing to review (an empty stat and, for the default target and `working`, no untracked files from `git ls-files --others --exclude-standard`): say so and stop. Size = `--shortstat` plus the lines of untracked files in the target, leaving out lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`, `Cargo.lock`, `poetry.lock`, `uv.lock`, `go.sum`, `composer.lock`, `Gemfile.lock`) and generated files: pathspecs such as `':!pnpm-lock.yaml'`, used in the reviewers' diff commands too. A changed lockfile goes to the security lens on its own, for supply-chain checks. Under about 300 changed lines, read the diff yourself to pick lenses. Larger: read only the stat and file list, never the whole diff (the reviewers read it, and a large diff would fill your context and delay them). Content triggers (`security` above all, also `performance` and `api-compat`) need the content: list matching files with the target's diff command plus `--name-only -G'<trigger regex>'` (untracked files: `grep -lE '<trigger regex>' <files>`), or open those files' diffs. Unsure whether `security` applies: include it.
 
 ## 2. Context
 
@@ -36,7 +38,7 @@ Split by size: under about 300 changed lines and at most 25 files, one `bosun:co
 
 ## 4. Review in parallel
 
-In one message, spawn the `bosun:code-reviewer` agents and, for the security lens, a `bosun:security-reviewer` in `diff` mode. Each prompt: the exact diff command; how to read full files (the working tree, or `git show <head>:<path>`); the lens or lenses; the intent and context (for a bosun task, its board path and id: the reviewer reads the brief); and "report only issues introduced or made worse by this diff".
+In one message, spawn the `bosun:code-reviewer` agents and, for the security lens, a `bosun:security-reviewer` in `diff` mode. Reviewers don't install dependencies or copy the repository: checks that need them use what is installed, or are reported as not run (if one matters, install once yourself and give every reviewer the path). Each prompt: the exact diff command; how to read full files (the working tree, or `git show <head>:<path>`); the lens or lenses; the intent and context (for a bosun task, its board path and id: the reviewer reads the brief); and "report only issues introduced or made worse by this diff".
 
 ## 5. Merge and verify
 
@@ -45,10 +47,12 @@ In one message, spawn the `bosun:code-reviewer` agents and, for the security len
 
 ## 6. Report
 
-Write `.bosun/reviews/<YYYY-MM-DD>-<slug>.md` with the reviewed range and head sha (`staged`: also the index tree from `git write-tree`), the findings and the pre-existing issues. Show the user:
-- the verdict: approve, approve with nits, or changes requested;
-- findings by severity, each with `path:line`, the problem and the failure scenario in a line each, the fix, and its verification status;
-- nits collapsed into one short list; pre-existing issues as a count with the report path, plus one line for each critical or security one.
+Write `.bosun/reviews/<YYYY-MM-DD>-<slug>.md` with the reviewed range and head sha (`staged`: also the index tree from `git write-tree`), the findings and the pre-existing issues, in the same layout as what you show the user. Severity markers, used in every finding list: 🔴 critical · 🟠 high · 🟡 medium · 🔵 low · ⚪ nit; ✅ verified, ❔ uncertain.
+- `## ✅ Approve`, `## 💬 Approve with nits` or `## ❌ Changes requested`, then the target, files and lines in one line;
+- a one-row count table: `| 🔴 Critical | 🟠 High | 🟡 Medium | 🔵 Low | ⚪ Nit |`;
+- findings under `### 🔴 Critical`, `### 🟠 High` and so on, most severe first, each as `**<n>. <title>** · `path:line` · <lens> · ✅` (or ❔), then the problem and the failure scenario in a line each, then `**Fix:** ...`; omit empty severities;
+- `### ⚪ Nits` as one short list; pre-existing issues as a count with the report path, plus one line for each critical or security one;
+- last, the token lines (shown to the user, not saved in the report).
 
 Be specific and calm; no padding, no filler praise.
 

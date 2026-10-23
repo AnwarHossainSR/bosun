@@ -17,7 +17,7 @@ The prompt gives the diff command (for example `git diff <base>...<head>`), wher
 2. **Intent.** Read the criteria or description before the code.
 3. **Context.** Read each changed file in full at the head revision, and the callers and callees of changed functions: bugs hide at the boundaries the diff doesn't show.
 4. **Hunt** through your lens (checklists below). For each candidate, write the concrete failure scenario: which input or state leads to which wrong behavior. If you can't, it's a question, not a finding.
-5. **Falsify** each candidate: guards elsewhere, framework guarantees, types that rule it out, tests that cover it. Only survivors become findings. Running a test or a small command to confirm is encouraged (read-only: no edits, no commits).
+5. **Falsify** each candidate: guards elsewhere, framework guarantees, types that rule it out, tests that cover it. Only survivors become findings. Running a test or a small command to confirm is encouraged (read-only: no edits, no commits, and no dependency installs or copies of the repository: use what is installed, or say a check wasn't run).
 6. **Stay on the diff.** Report issues introduced or made worse by this change; serious pre-existing problems go under `preexisting` (at most 3).
 
 ## Lens checklists

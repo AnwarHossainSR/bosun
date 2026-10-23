@@ -58,7 +58,7 @@ Not sure which command fits? `/bosun:manager <goal in plain words>` picks one fo
 | `/bosun:plan <idea \| #issue>` | Clarifying questions, an OpenSpec change and task board, your approval. Large or security-sensitive work also gets scouts and a critique round; `--solo` skips them, `--crew` adds them, and the flag carries over to the build. `--classic` writes a PLAN.md instead. |
 | `/bosun:build [plan]` | Runs the board solo or with parallel agents in worktrees, review-gated merges and resume (`--solo`, `--crew`, `--resume`, `--parallel N`, `--dry-run`). |
 | `/bosun:status [--audit]` | Progress, work in flight, blocked tasks, what's next; `--audit` adds a health check. |
-| `/bosun:review [target]` | Parallel lens review of the branch, staged or working changes, a range or a commit; `--fix` applies confirmed fixes. |
+| `/bosun:review [target]` | Parallel lens review of the branch, staged or working changes, a range or a commit, with findings ranked 🔴 critical, 🟠 high, 🟡 medium, 🔵 low and ⚪ nit; `--fix` applies confirmed fixes. |
 | `/bosun:review-pr <n \| url>` | The same panel on a GitHub PR, in a separate worktree; posts only text you approve. |
 | `/bosun:investigate <symptom>` | Competing hypotheses tested in parallel, a verified root cause and a report; `--fix` fixes it test-first. |
 | `/bosun:security-audit [--full]` | Attack-surface map, your installed scanners, reviewers per area, verified findings. |
@@ -135,7 +135,8 @@ Already using OpenSpec for your own work? Give bosun its own git-ignored folder,
 - **Agents fetch their own brief** with the task board, so the manager doesn't retype it into every prompt.
 - **Results go to disk.** A hook saves each agent's report next to its plan (`.bosun/plans/<name>/results/`, or `.bosun/results/` outside a plan); the manager reads the short result block and points later agents to the file.
 - **Quiet logs.** Long test, build and scanner output goes to a log, and agents read the last 40 lines unless something failed.
-- **Right-sized reviews.** A small diff gets one reviewer covering all its lenses, a large one a reviewer per lens.
+- **Right-sized reviews.** A small diff gets one reviewer covering all its lenses, a large one a reviewer per lens. Lockfile diffs go to the security reviewer only, and reviewers never install dependencies on their own.
+- **See what each run cost.** Every report ends with token lines from `scripts/usage.py`, read from Claude Code's own transcript files: this run and its agents, the whole session, and how much of the context window is left. Plan limits aren't in those files; `/usage` shows them.
 - **Terse prose.** Agent reports use a short "caveman" style. Code, commands, paths and quoted specs stay exact, and commits, PRs and docs stay normal prose. Set `output_style` to `normal` to turn it off.
 
 A crew build still does much more work than a single session. Start with a small plan to see the flow; to spend less on a big one, try `--solo` when the board allows it, lower `build.max_parallel`, use `build.review: batch`, or run implementers on `sonnet`.

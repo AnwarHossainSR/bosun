@@ -18,6 +18,8 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
 
 **Local OpenSpec directory:** one git ignores (`git check-ignore -q <openspec_dir>/changes` succeeds), such as `.bosun/openspec` beside a project's own OpenSpec. Its files never go into git: follow the *local* notes, which skip those git steps. Worktrees don't contain it; agents read the change from the main checkout via the absolute paths in `TB brief`.
 
+**Tokens:** first run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py"` `start` and keep its `mark`; the report ends with the lines `usage.py report --since <mark>` prints (this run, the session, the context left; plan limits are in `/usage`). SUMMARY.md gets them with `--agents 5`, the agents that used most.
+
 ## 0. Preflight (stop and ask about anything red)
 
 1. **Board:** the argument (change id, slug, directory or path), else `TB latest`. `TB validate <board>`; OpenSpec plan: also `TB spec-check <board>` and, with the CLI (from the OpenSpec directory's parent), `OPENSPEC_TELEMETRY=0 openspec validate <id> --strict --no-interactive`. Errors mean stop.
@@ -113,4 +115,4 @@ When the board is complete, or only blocked and skipped tasks remain (with `--on
 4. OpenSpec plan: `TB spec-check <board>` clean and every task line in tasks.md ticked. Skipped tasks stay unticked: ask whether to drop them from the change (architect, revise mode) or finish them. With the CLI, `openspec validate <id> --strict --no-interactive` once more, from the OpenSpec directory's parent.
 5. No docs task in the plan, and no solo run that updated them: spawn `bosun:docs-writer` for the README and CHANGELOG.
 6. Write `.bosun/plans/<name>/SUMMARY.md` from the board, `.bosun/plans/<name>/results/` (several files for one task are retries or reviews; the newest is the latest) and your notes: what was delivered (per requirement for an OpenSpec plan), deviations from the plan, spec gaps the agents reported, decisions made along the way, follow-ups, known issues, how to run it.
-7. Tell the user the outcome in a few lines, separating what you verified from what you didn't. Next: `/bosun:ship` pushes and opens the PR (never push yourself); OpenSpec plan: `/bosun:archive <id>` merges the change into `<openspec_dir>/specs/`. Archiving on the work branch before shipping lets the PR carry the updated specs; some teams archive after review instead. A local OpenSpec directory never reaches the PR.
+7. Tell the user the outcome in a few lines, separating what you verified from what you didn't, then the token lines. Next: `/bosun:ship` pushes and opens the PR (never push yourself); OpenSpec plan: `/bosun:archive <id>` merges the change into `<openspec_dir>/specs/`. Archiving on the work branch before shipping lets the PR carry the updated specs; some teams archive after review instead. A local OpenSpec directory never reaches the PR.

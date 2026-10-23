@@ -14,6 +14,8 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"`. Read `.bosun/config
 
 When `.bosun/` exists, the SubagentStop hook saves each bosun agent's final message as `.bosun/results/<UTC time>-<agent>-<task>-<agent id>.md`, where `<task>` is its result block's `task`. Create `.bosun/` first if it's missing (the board goes there anyway), give every agent a unique task label (such as `recon-auth`), find its file with `ls -t .bosun/results/*-<agent>-<label>-* .bosun/plans/*/results/*-<agent>-<label>-* 2>/dev/null | head -1`, and hand later agents that absolute path plus exactly which items to act on (accepted ids) instead of pasting the report. No file: paste a summary.
 
+**Tokens:** first run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py"` `start` and keep its `mark`; the report ends with the lines `usage.py report --since <mark>` prints (this run, the session, the context left; plan limits are in `/usage`).
+
 ## 0. Format
 
 - **openspec** (default): the plan is an OpenSpec change in `<openspec_dir>/changes/<id>/` (`<openspec_dir>` = `planning.openspec_dir`, default `openspec`; `.bosun/openspec` keeps bosun's changes local, out of git and apart from a project's own OpenSpec): proposal.md (why), `specs/<capability>/spec.md` (requirements with scenarios), design.md (how), tasks.md (checklist). The board is `.bosun/plans/<id>/tasks.json`, linked by `meta.openspec_change`, with the same task ids as tasks.md.
@@ -57,6 +59,7 @@ Show the user, concisely:
 - task count by agent;
 - the build route from `TB route`: solo (one implementer does the tasks in order, then one review and one merge) or crew (parallel agents, a review per task: waves, critical path and the first wave from `TB waves`); `/bosun:build <id> --crew` or `--solo` overrides it;
 - top risks, assumptions and open questions, including security-sensitive tasks no threat model covered (`--solo` or `--no-critique`);
-- the paths: the change directory (proposal.md, specs/, design.md, tasks.md) and the board. `TB graph <board>` (a Mermaid diagram) only if asked.
+- the paths: the change directory (proposal.md, specs/, design.md, tasks.md) and the board. `TB graph <board>` (a Mermaid diagram) only if asked;
+- the token lines.
 
 Ask: approve, change something, or stop. The spec is the contract, so changes go back through the architect in **revise** mode and are validated again (step 4); if the board now has security-sensitive tasks, or is `large`, that no critique covered, run step 5 before asking again. With `--solo` or `--no-critique` step 5 doesn't run: name the security-sensitive tasks no threat model covered (a `large` board: say no critique covered it), then ask. On approval, offer `/bosun:build <id>` (with the plan's `--solo` or `--crew`, if given), or start it so if the user already said to build. Never start building without approval. The change files stay uncommitted until the build commits them on its work branch; a local OpenSpec directory (git ignores it) is never committed.

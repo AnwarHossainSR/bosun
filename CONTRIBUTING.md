@@ -43,6 +43,7 @@ claude plugin install bosun@bosun-marketplace
 | `plugins/bosun/skills/<name>/SKILL.md` | User-facing workflows (`/bosun:<name>`); `build/reference/execution.md` holds the build's edge cases |
 | `plugins/bosun/agents/<name>.md` | Subagent definitions (`bosun:<name>`) |
 | `plugins/bosun/scripts/taskboard.py` | Task board CLI used by the skills (standard library only) |
+| `plugins/bosun/scripts/usage.py` | Token report from Claude Code's transcript files, for the end of every report (standard library only) |
 | `plugins/bosun/hooks/` | Guard, activity log, result saving and context injection for bosun agents |
 | `plugins/bosun/templates/config.json` | Template for a project's `.bosun/config.json` |
 | `tests/` | Unit tests for the task board and the hooks |

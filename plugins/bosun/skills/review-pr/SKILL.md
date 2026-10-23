@@ -10,6 +10,8 @@ Pull request: $ARGUMENTS
 
 **Style:** `output_style` in `.bosun/config.json` (default `caveman`): your prose and agent prompts terse, no filler; code, commands, paths, errors, numbers and quotes exact; keep logic words (because, so, but, not, only, can, may, must); full sentences for warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty; never drop a fact or an uncertainty label. Commits, PR text, docs and specs: normal prose. `normal` turns it off.
 
+**Tokens:** first run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py"` `start` and keep its `mark`; the report ends with the lines `usage.py report --since <mark>` prints (this run, the session, the context left; plan limits are in `/usage`).
+
 Needs the GitHub CLI: `gh auth status` must succeed; if not, explain `gh auth login` and stop. A PR in another repository: add `--repo <owner>/<repo>` to the gh commands.
 
 ## 1. Fetch
@@ -21,7 +23,7 @@ Needs the GitHub CLI: `gh auth status` must succeed; if not, explain `gh auth lo
 
 ## 2. Check out without touching the user's work
 
-`<src>` is `origin` for a PR in this repository, else `https://github.com/<owner>/<repo>.git`. `git fetch <src> pull/<number>/head:bosun/pr-<number>` (prefix the refspec with `+` to update an existing branch), then `git worktree add .bosun/worktrees/pr-<number> bosun/pr-<number>`. For diffs, `git fetch <src> <baseRefName>` and at once take `git merge-base FETCH_HEAD bosun/pr-<number>` as the base (note its sha).
+`<src>` is `origin` for a PR in this repository, else `https://github.com/<owner>/<repo>.git`. `git fetch <src> pull/<number>/head:bosun/pr-<number>` (prefix the refspec with `+` to update an existing branch), then `git worktree add .bosun/worktrees/pr-<number> bosun/pr-<number>`. For diffs, `git fetch <src> <baseRefName>` and at once take `git merge-base FETCH_HEAD bosun/pr-<number>` as the base (note its sha). Installing the PR's dependencies runs its install scripts, which is its code: for a PR from this repository's own branches, install once in the worktree if a check needs it; for a PR from a fork, ask first.
 
 Fetch fails (a non-GitHub remote, missing permissions): `mkdir -p .bosun/reviews`, save `gh pr diff <pr>` to `.bosun/reviews/pr-<number>.diff`, and say the review had no full-file context.
 
@@ -31,7 +33,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/review/SKILL.md` and follow its steps 3-5 wit
 
 ## 4. Draft
 
-Save `.bosun/reviews/pr-<number>.md`: a summary (verdict, top issues, open questions, specific praise only where earned), then each finding with `path:line` (in the PR's new version), the problem, the failure scenario and the suggested fix. Show the draft to the user.
+Save `.bosun/reviews/pr-<number>.md` in the review skill's step 6 layout (verdict heading, count table, findings by severity with their markers), with `path:line` in the PR's new version, open questions, and specific praise only where earned. Show the draft to the user, then the token lines; they stay out of anything posted.
 
 ## 5. Post (only after the user approves the final text)
 

@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-23
+
+### Added
+- A token report at the end of every report (`/bosun:review`, `review-pr`, `security-audit`, `investigate`, `plan` and `build`). The new `scripts/usage.py` reads Claude Code's own transcript files for the session and its subagents. It shows this run's tokens, the agents it started and the session total, each with output, new input and cache reads, plus how much of the context window is left (the window size is inferred). A build's SUMMARY.md also lists the agents that used most. Plan limits aren't in those files, so the report points to `/usage`.
+- Review reports mark severity in color: 🔴 critical, 🟠 high, 🟡 medium, 🔵 low and ⚪ nit, with ✅ for verified findings and ❔ for uncertain ones. They open with a verdict heading and a count table, then group findings by severity. `/bosun:review-pr` drafts and posts in the same layout, and `/bosun:security-audit` uses it with the overall risk as the heading.
+
+### Changed
+- Reviews leave lockfiles and generated files out of their size and of the reviewers' diffs, and send a changed lockfile to the security lens alone, for supply-chain checks. On a pull request whose `pnpm-lock.yaml` was 1,381 of 1,849 added lines, every reviewer used to get the whole lockfile.
+- Reviewers no longer install dependencies or copy the repository on their own. `/bosun:review-pr` installs a PR's dependencies only for branches of the same repository, and asks first for a fork, because install scripts run the PR's code.
+
 ## [0.5.1] - 2026-10-22
 
 ### Fixed

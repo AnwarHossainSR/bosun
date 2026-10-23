@@ -10,6 +10,8 @@ Scope: $ARGUMENTS
 
 **Style:** `output_style` in `.bosun/config.json` (default `caveman`): your prose and agent prompts terse, no filler; code, commands, paths, errors, numbers and quotes exact; keep logic words (because, so, but, not, only, can, may, must); full sentences for warnings, destructive steps, ordered steps, questions, requests to confirm and statements of uncertainty; never drop a fact or an uncertainty label. Commits, PR text, docs and specs: normal prose. `normal` turns it off.
 
+**Tokens:** first run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py"` `start` and keep its `mark`; the report ends with the lines `usage.py report --since <mark>` prints (this run, the session, the context left; plan limits are in `/usage`).
+
 ## 1. Scope
 
 - **Default (diff)**: the `bosun:review` skill's default target (this branch against its base, plus uncommitted work).
@@ -37,7 +39,7 @@ Every critical and high finding, and any medium one with low confidence, goes to
 
 ## 5. Report
 
-Write `.bosun/reviews/<YYYY-MM-DD>-security.md`: overall risk; findings by severity (location, attacker, scenario, impact, fix, CWE when certain, verification status); controls that work; a hardening backlog; tools that ran and tools that weren't available. Never include secret values: location and type only, and tell the user to rotate anything that looks real.
+Write `.bosun/reviews/<YYYY-MM-DD>-security.md`, and show the user, in the review skill's step 6 layout: overall risk as the heading (🔴, 🟠, 🟡 or 🔵 with the level), the count table without nits, findings by severity (location, attacker, scenario, impact, fix, CWE when certain, ✅ or ❔), then the token lines (shown, not saved); controls that work; a hardening backlog; tools that ran and tools that weren't available. Never include secret values: location and type only, and tell the user to rotate anything that looks real.
 
 ## 6. --fix
 
