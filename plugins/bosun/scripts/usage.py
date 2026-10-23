@@ -3,7 +3,9 @@
 
 Claude Code writes a session to <config>/projects/<project>/<session id>.jsonl (config: $CLAUDE_CONFIG_DIR, else
 ~/.claude) and each of its subagents to <session id>/subagents/agent-<id>.jsonl beside it, with the token usage of
-every API response. This sums them for the whole session, and since a mark for one run:
+each API response. This sums them for the whole session, and since a mark for one run. A subagent's response is
+often saved before its final output count, so agent output is a lower bound (shown as "≥"); compactions aren't
+saved as responses and are estimated from their recorded size.
 
   usage.py start                   print a mark (now) and the session so far
   usage.py report --since <mark>   report lines for the run since the mark, the session and the context left
@@ -24,6 +26,8 @@ from pathlib import Path
 DEFAULT_WINDOW = 200_000
 LARGE_WINDOW = 1_000_000
 SLUG_LIMIT = 200  # Claude Code cuts project folder names here and appends a hash
+# Models whose window Claude Code's own model table gives as 1M (2.1.240 and 2.1.306); older ones have 200k.
+NATIVE_1M = re.compile(r"claude-(?:opus-(?:4-[7-9]|[5-9])|sonnet-[5-9]|haiku-[5-9]|fable|mythos)")
 FIELDS = ("input", "cache_write", "cache_read", "output")
 
 
@@ -95,6 +99,8 @@ def find_transcript(explicit=None, session=None, cwd=None) -> Path:
             path = d / f"{session}.jsonl"
             if path.is_file():
                 return path
+        die(f"no transcript for session {session} under {projects} (session persistence off?); "
+            "pass --transcript <path to the session's .jsonl>")
     # The current session's transcript is the newest: it was written a moment ago, for this very command.
     for d in dirs:
         newest = max(d.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, default=None)
@@ -102,10 +108,10 @@ def find_transcript(explicit=None, session=None, cwd=None) -> Path:
             return newest
     # Folder named some other way: the newest transcript started in this directory or a parent of it.
     recent = sorted(projects.glob("*/*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)[:30]
-    norm = (lambda s: s.lower()) if os.name == "nt" else (lambda s: s)
+    mine = {os.path.normcase(str(p)) for p in (here, *here.parents)}
     for path in recent:
         started = first_cwd(path)
-        if started and norm(str(here)).startswith(norm(str(Path(started)))):
+        if started and os.path.normcase(str(Path(started))) in mine:
             return path
     die(f"no transcript for {here} under {projects}; pass --transcript <path to the session's .jsonl>")
 
@@ -124,7 +130,8 @@ def parse_ts(value):
 
 def read_usage(path: Path):
     """One record per API response. A response with several content blocks is written as several lines that share
-    its message id; keep the largest counts (a streamed line can carry partial output)."""
+    its message id; keep the largest counts. A response with no line carrying its stop_reason has only the output
+    count from the start of its stream: `final` is false. A compaction is a system line with the size it summarised."""
     records, start = {}, None
     try:
         fh = open(path, encoding="utf-8", errors="replace")
@@ -137,6 +144,18 @@ def read_usage(path: Path):
                     start = parse_ts(json.loads(line).get("timestamp"))
                 except (json.JSONDecodeError, AttributeError):
                     pass
+            if '"compact_boundary"' in line:
+                try:
+                    entry = json.loads(line)
+                    meta = entry.get("compactMetadata") or {}
+                    tokens = int(meta.get("preTokens") or 0)
+                except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
+                    tokens = 0
+                if tokens and entry.get("subtype") == "compact_boundary":
+                    records[f"compact-{entry.get('uuid') or n}"] = {
+                        "ts": parse_ts(entry.get("timestamp")), "model": "", "final": True, "compaction": True,
+                        "input": tokens, "cache_write": 0, "cache_read": 0, "output": 0}
+                continue
             if '"usage"' not in line or '"assistant"' not in line:
                 continue
             try:
@@ -155,13 +174,18 @@ def read_usage(path: Path):
                 "cache_read": int(usage.get("cache_read_input_tokens") or 0),
                 "output": int(usage.get("output_tokens") or 0),
             }
+            if not any(counts.values()):
+                continue  # synthetic and API-error messages: no tokens
             key = msg.get("id") or entry.get("uuid") or f"line{n}"
+            final = msg.get("stop_reason") is not None
             old = records.get(key)
             if old:
                 for f in FIELDS:
                     old[f] = max(old[f], counts[f])
+                old["final"] = old["final"] or final
             else:
-                records[key] = {"ts": parse_ts(entry.get("timestamp")), "model": str(msg.get("model") or ""), **counts}
+                records[key] = {"ts": parse_ts(entry.get("timestamp")), "model": str(msg.get("model") or ""),
+                                "final": final, "compaction": False, **counts}
     return list(records.values()), start
 
 
@@ -179,10 +203,12 @@ def agent_label(path: Path) -> str:
 def totals(records):
     out = {f: sum(r[f] for r in records) for f in FIELDS}
     out["total"] = sum(out.values())
+    out["output_partial"] = sum(1 for r in records if not r["final"])  # responses whose output is only a lower bound
+    out["compaction"] = sum(r["input"] for r in records if r["compaction"])
     return out
 
 
-def gather(transcript: Path, since=None):
+def gather(transcript: Path, since=None, window=None):
     main, start = read_usage(transcript)
     agents = []
     folder = transcript.with_suffix("")
@@ -192,32 +218,38 @@ def gather(transcript: Path, since=None):
             if recs:
                 agents.append({"label": agent_label(path), "file": str(path), "records": recs})
 
-    def window(recs):
+    def in_run(recs):
         return [r for r in recs if since is None or (r["ts"] and r["ts"] >= since)]
 
     result = {"transcript": str(transcript), "session_start": start.isoformat() if start else None}
     sess_agents = [{"label": a["label"], **totals(a["records"])} for a in agents]
     result["session"] = {"main": totals(main), "agents": len(agents),
                          "agents_total": sum(a["total"] for a in sess_agents),
-                         "agents_output": sum(a["output"] for a in sess_agents)}
+                         "agents_output": sum(a["output"] for a in sess_agents),
+                         "output_partial": sum(a["output_partial"] for a in sess_agents) + totals(main)["output_partial"]}
     result["session"]["total"] = result["session"]["main"]["total"] + result["session"]["agents_total"]
     if since is not None:
-        run_agents = [{"label": a["label"], **totals(window(a["records"]))} for a in agents]
+        run_agents = [{"label": a["label"], **totals(in_run(a["records"]))} for a in agents]
         run_agents = [a for a in run_agents if a["total"]]
-        run_main = totals(window(main))
-        both = {f: run_main[f] + sum(a[f] for a in run_agents) for f in FIELDS}
+        run_main = totals(in_run(main))
+        both = {f: run_main[f] + sum(a[f] for a in run_agents) for f in (*FIELDS, "output_partial", "compaction")}
         result["run"] = {"since": since.isoformat(), "main": run_main, "agents": len(run_agents),
-                         "total": run_main["total"] + sum(a["total"] for a in run_agents), **{f"all_{f}": both[f] for f in FIELDS},
+                         "total": run_main["total"] + sum(a["total"] for a in run_agents), **{f"all_{f}": v for f, v in both.items()},
                          "top": sorted(run_agents, key=lambda a: a["total"], reverse=True)}
     else:
         result["run"] = None
         result["top"] = sorted(sess_agents, key=lambda a: a["total"], reverse=True)
     # Context: what the main session's last response read and wrote, which the next one starts from.
-    last = max((r for r in main if r["ts"]), key=lambda r: r["ts"], default=None)
+    replies = [r for r in main if r["ts"] and not r["compaction"]]
+    last = max(replies, key=lambda r: r["ts"], default=None)
     used = sum(last[f] for f in FIELDS) if last else 0
-    peak = max((sum(r[f] for f in FIELDS) for r in main), default=0)
-    large = peak > DEFAULT_WINDOW or "[1m]" in (last or {}).get("model", "")
-    result["context"] = {"used": used, "window": LARGE_WINDOW if large else DEFAULT_WINDOW, "window_assumed": True}
+    peak = max((sum(r[f] for f in FIELDS) for r in replies), default=0)
+    if window:
+        size, assumed = window, False
+    else:
+        large = peak > DEFAULT_WINDOW or bool(NATIVE_1M.search((last or {}).get("model", "")))
+        size, assumed = (LARGE_WINDOW if large else DEFAULT_WINDOW), True
+    result["context"] = {"used": used, "window": size, "window_assumed": assumed}
     return result
 
 
@@ -241,8 +273,13 @@ def hhmm(iso) -> str:
 def context_line(ctx) -> str:
     left = max(0, ctx["window"] - ctx["used"])
     pct = round(100 * ctx["used"] / ctx["window"]) if ctx["window"] else 0
-    return (f"🧠 **Context:** {human(ctx['used'])} of ~{human(ctx['window'])} used ({pct}%), ~{human(left)} left"
+    approx = "~" if ctx["window_assumed"] else ""
+    return (f"🧠 **Context:** {human(ctx['used'])} of {approx}{human(ctx['window'])} used ({pct}%), {approx}{human(left)} left"
             " · plan limits left: run `/usage`")
+
+
+def out(n: int, partial: int) -> str:
+    return f"≥{human(n)}" if partial else human(n)
 
 
 def report_lines(res, agents: int):
@@ -251,17 +288,21 @@ def report_lines(res, agents: int):
     run = res["run"]
     if run:
         lines.append(f"📊 **Tokens, this run:** {human(run['total'])} across the main session and {run['agents']} agent(s)"
-                     f" · output {human(run['all_output'])} · new input {human(run['all_input'] + run['all_cache_write'])}"
-                     f" · cache reads {human(run['all_cache_read'])}")
+                     f" · output {out(run['all_output'], run['all_output_partial'])}"
+                     f" · new input {human(run['all_input'] + run['all_cache_write'])}"
+                     f" · cache reads {human(run['all_cache_read'])}"
+                     + (f" · compaction ~{human(run['all_compaction'])}" if run["all_compaction"] else ""))
         top = run["top"]
     else:
         top = res["top"]
     lines.append(f"🧾 **Session:** {human(sess['total'])} since {hhmm(res['session_start'])}"
                  f" (main {human(sess['main']['total'])}, {sess['agents']} agent(s) {human(sess['agents_total'])};"
-                 f" output {human(sess['main']['output'] + sess['agents_output'])})")
+                 f" output {out(sess['main']['output'] + sess['agents_output'], sess['output_partial'])})")
     lines.append(context_line(res["context"]))
     for a in top[:agents]:
-        lines.append(f"   - {human(a['total'])} (output {human(a['output'])}): {a['label']}")
+        lines.append(f"   - {human(a['total'])} (output {out(a['output'], a['output_partial'])}): {a['label']}")
+    if (run or {}).get("all_output_partial") or (not run and sess["output_partial"]):
+        lines.append("   ≥: some agent replies were saved before their final output count; `/usage` has the exact totals")
     return lines
 
 
@@ -283,12 +324,22 @@ def main(argv=None) -> int:
         if name == "report":
             p.add_argument("--since", help="the mark `start` printed (ISO time)")
             p.add_argument("--agents", type=int, default=0, metavar="N", help="also list the N agents that used most")
+        p.add_argument("--window", type=int, metavar="TOKENS",
+                       help="the context window (default: $CLAUDE_CODE_MAX_CONTEXT_TOKENS, else inferred from the model)")
     args = parser.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):  # Windows pipes default to the ANSI code page, which can't print emoji
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+    window = args.window
+    if not window and (os.environ.get("CLAUDE_CODE_MAX_CONTEXT_TOKENS") or "").strip().isdigit():
+        window = int(os.environ["CLAUDE_CODE_MAX_CONTEXT_TOKENS"])
     since = None
     if getattr(args, "since", None):
         since = parse_ts(args.since) or die(f"--since expects an ISO time such as 2026-10-23T10:39:02Z, got {args.since!r}", 2)
     transcript = find_transcript(args.transcript, args.session)
-    res = gather(transcript, since)
+    res = gather(transcript, since, window or None)
     if args.command == "start":
         mark = now_mark()
         if args.json:
@@ -297,12 +348,15 @@ def main(argv=None) -> int:
             return 0
         print(f"mark: {mark}")
         print(f"session so far: {human(res['session']['total'])} tokens ({res['session']['agents']} agent(s)); "
-              f"context {human(res['context']['used'])} of ~{human(res['context']['window'])}")
+              f"context {human(res['context']['used'])} of {'~' if res['context']['window_assumed'] else ''}"
+              f"{human(res['context']['window'])}")
         return 0
     if args.json:
-        for part in ([res["run"]] if res["run"] else []):
-            part["top"] = part["top"][: max(args.agents, 0)]
-        res.pop("top", None)
+        n = max(args.agents, 0)
+        if res["run"]:
+            res["run"]["top"] = res["run"]["top"][:n]
+        else:
+            res["top"] = res["top"][:n]
         print(json.dumps(res, separators=(",", ":"), default=str))
         return 0
     print("\n".join(report_lines(res, max(args.agents, 0))))

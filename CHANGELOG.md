@@ -7,12 +7,20 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [0.6.0] - 2026-10-23
 
 ### Added
-- A token report at the end of every report (`/bosun:review`, `review-pr`, `security-audit`, `investigate`, `plan` and `build`). The new `scripts/usage.py` reads Claude Code's own transcript files for the session and its subagents. It shows this run's tokens, the agents it started and the session total, each with output, new input and cache reads, plus how much of the context window is left (the window size is inferred). A build's SUMMARY.md also lists the agents that used most. Plan limits aren't in those files, so the report points to `/usage`.
-- Review reports mark severity in color: 🔴 critical, 🟠 high, 🟡 medium, 🔵 low and ⚪ nit, with ✅ for verified findings and ❔ for uncertain ones. They open with a verdict heading and a count table, then group findings by severity. `/bosun:review-pr` drafts and posts in the same layout, and `/bosun:security-audit` uses it with the overall risk as the heading.
+- A token report at the end of the review, review-pr, security-audit, investigate, plan and build reports, from the new `scripts/usage.py`. It reads Claude Code's own transcript files for the session and its subagents, and shows:
+  - this run's tokens (output, new input and cache reads) and how many agents it started;
+  - the session total with its output;
+  - how much of the context window is left;
+  - for a build, the five agents that used most.
+
+  Agents' output is a lower bound ("≥"), because their transcripts often keep only the first count of a reply. Compactions aren't saved as replies, so they're estimated from their recorded size. The window comes from `CLAUDE_CODE_MAX_CONTEXT_TOKENS` when you've set it, else from the model (1M for Opus 4.7 and later, Sonnet 5, Haiku 5, Fable and Mythos; 200k for older models), marked "~". Output is written as UTF-8, so a Windows pipe can't break it; the report hasn't been run on Windows yet. Plan limits aren't in those files, so the report points to `/usage`. The lines go only in the last message to you: never in a saved report, SUMMARY.md or a posted PR comment. A skill run by another one (a build's final review) leaves them to the outer skill.
+- Review reports mark severity in color: 🔴 critical, 🟠 high, 🟡 medium, 🔵 low and ⚪ nit. A finding shows ✅ when the verifier confirmed it, ❔ when it was uncertain, and the reviewer's confidence otherwise. Reports open with a verdict heading and a count table, then group findings by severity. `/bosun:review-pr` drafts and posts in the same layout: one comment, or a body plus one inline comment per finding. `/bosun:security-audit` uses it with the overall risk as the heading.
 
 ### Changed
-- Reviews leave lockfiles and generated files out of their size and of the reviewers' diffs, and send a changed lockfile to the security lens alone, for supply-chain checks. On a pull request whose `pnpm-lock.yaml` was 1,381 of 1,849 added lines, every reviewer used to get the whole lockfile.
-- Reviewers no longer install dependencies or copy the repository on their own. `/bosun:review-pr` installs a PR's dependencies only for branches of the same repository, and asks first for a fork, because install scripts run the PR's code.
+- Reviews always leave lockfiles and files marked `linguist-generated` out of their size and of the reviewers' diffs, including lockfiles in monorepo subfolders. A changed lockfile adds the security lens, and one security reviewer gets those files alone, for supply-chain checks. `/bosun:review-pr` and the build's review gates do the same.
+  - This used to depend on the session. In one run on a pull request whose `pnpm-lock.yaml` was 1,379 of 1,849 added lines, it kept the lockfile away from three reviewers on its own.
+- Reviewers and verifiers no longer install dependencies, use on-demand runners such as `npx` or `uv run`, or copy the repository. A check that needs more is reported as not run. When an install matters, it happens once, with the lockfile frozen.
+- `/bosun:review-pr` runs a PR's code (installs, tests, scripts) only for a same-repository PR that doesn't change dependencies. For a fork, or a dependency change, it asks first; without a yes, its agents only read files.
 
 ## [0.5.1] - 2026-10-22
 

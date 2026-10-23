@@ -12,7 +12,7 @@ Problem: $ARGUMENTS
 
 Long command output goes to a log you tail: `set -o pipefail; log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)`. If the tail doesn't show the cause (the first error, the top of a traceback), grep or read more of that log. When `.bosun/` exists, agents' final messages are also saved in `.bosun/results/`.
 
-**Tokens:** first run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py"` `start` and keep its `mark`; the report ends with the lines `usage.py report --since <mark>` prints (this run, the session, the context left; plan limits are in `/usage`).
+**Tokens:** before anything else, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py" start` and note the `mark:` it prints. At the end, run it with `report --since <mark>` and end your last message to the user (when you fix: after step 9) with its lines as printed, never in a file you write or text you post. If the script fails, say so in one line.
 
 ## 1. Frame the problem
 
@@ -50,7 +50,7 @@ Agent teams enabled and the user asked for a debate: spawn the investigators as 
 
 ## 8. Report
 
-Write `.bosun/investigations/<YYYY-MM-DD>-<slug>.md`: summary; root cause with `path:line` and evidence; the causal chain; why it wasn't caught; fix options with trade-offs and a recommendation; the regression test; related risks elsewhere. Show the user a short version: the root cause in two sentences, your confidence, the recommended fix, then the token lines.
+Write `.bosun/investigations/<YYYY-MM-DD>-<slug>.md`: summary; root cause with `path:line` and evidence; the causal chain; why it wasn't caught; fix options with trade-offs and a recommendation; the regression test; related risks elsewhere. Show the user a short version: the root cause in two sentences, your confidence, the recommended fix.
 
 Clean up: once you've confirmed investigator worktrees hold only experiments, remove them (`git worktree remove --force <path>`) and delete their branches.
 
