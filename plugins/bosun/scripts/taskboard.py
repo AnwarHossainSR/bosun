@@ -24,7 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 STATUSES = ("pending", "in_progress", "review", "done", "blocked", "failed", "skipped")
 FINISHED = frozenset({"done", "skipped"})
 INFLIGHT = frozenset({"in_progress", "review"})
@@ -1719,8 +1719,9 @@ def cmd_status(args) -> int:
     if errors:
         print(f"Board has {len(errors)} validation error(s); run `validate`.")
     else:
-        solo = plan_route(board) if meta.get("route") == "solo" else None  # counts what is left to build, as route does
-        print((f"Remaining: {solo['tasks']} task(s) to build in one solo run, in order"
+        # A solo run builds the route's order: not tasks in review, nor those behind blocked ones (unschedulable).
+        solo = plan_route(board) if meta.get("route") == "solo" else None
+        print((f"Remaining: {len(solo['order'])} task(s) to build in one solo run, in order"
                + (f", {len(solo['in_review'])} in review" if solo["in_review"] else "")
                + " (progress shows in its task commits)"
                if solo else
