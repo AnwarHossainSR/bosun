@@ -30,8 +30,8 @@ Then, in Claude Code inside your project:
 
 ```text
 /bosun:setup                              one-time: detects your commands, writes .bosun/config.json
-/bosun:plan add CSV export to reports     spec and task board for your approval (or /bosun:plan #123)
-/bosun:build                              builds it: one implementer, or a parallel crew for a big plan
+/bosun:propose add CSV export to reports  spec and task board for your approval (same as /bosun:plan; or #123)
+/bosun:apply                              builds it task by task (same as /bosun:build): solo, or a crew for a big plan
 /bosun:review                             multi-lens review of the branch
 /bosun:ship                               final checks, push and pull request (asks first)
 ```
@@ -45,7 +45,7 @@ Not sure which command fits? `/bosun:manager <goal in plain words>` picks one fo
 - **Your team:** run both commands with `--scope project` and commit `.claude/settings.json`. A teammate who doesn't see bosun runs the install command once.
 - **Claude Code on the web:** install inside the cloud container, for example from the environment's setup script (both commands are safe to run again).
 - **Try it without installing:** `claude --plugin-dir /path/to/bosun/plugins/bosun`.
-- **Check it loaded:** `claude plugin details bosun` lists 12 skills, 10 agents and 4 hooks.
+- **Check it loaded:** `claude plugin details bosun` lists 14 skills, 10 agents and 4 hooks.
 - **Update:** `claude plugin marketplace update bosun-marketplace`, then `claude plugin update bosun@bosun-marketplace` with the scope you installed (`--scope local` or `--scope project`; some Claude Code versions update only user scope otherwise), then start a new session. [CHANGELOG.md](CHANGELOG.md) has the release notes.
 
 </details>
@@ -55,11 +55,11 @@ Not sure which command fits? `/bosun:manager <goal in plain words>` picks one fo
 | Command | What it does |
 |---|---|
 | `/bosun:manager <goal>` | Routes any goal to the lightest workflow, from a single agent to a full crew. |
-| `/bosun:plan <idea \| #issue>` | Clarifying questions, an OpenSpec change and task board, your approval. Large or security-sensitive work also gets scouts and a critique round; `--solo` skips them, `--crew` adds them, and the flag carries over to the build. `--classic` writes a PLAN.md instead. |
-| `/bosun:build [plan]` | Runs the board solo or with parallel agents in worktrees, review-gated merges and resume (`--solo`, `--crew`, `--resume`, `--parallel N`, `--dry-run`). |
+| `/bosun:plan <idea \| #issue>`, or `/bosun:propose` | Clarifying questions, an OpenSpec change and task board, your approval. Large or security-sensitive work also gets scouts and a critique round; `--solo` skips them, `--crew` adds them, and the flag carries over to the build. `--classic` writes a PLAN.md instead. |
+| `/bosun:build [plan]`, or `/bosun:apply` | Runs the board solo or with parallel agents in worktrees, review-gated merges and resume (`--solo`, `--crew`, `--resume`, `--parallel N`, `--dry-run`), showing progress as OpenSpec's apply does (`✓ 1.2 · 3/7`). An OpenSpec change without a board gets one first. |
 | `/bosun:status [--audit]` | Progress, work in flight, blocked tasks, what's next; `--audit` adds a health check. |
 | `/bosun:review [target]` | Parallel lens review of the branch, staged or working changes, a range or a commit, with findings ranked 🔴 critical, 🟠 high, 🟡 medium, 🔵 low and ⚪ nit; `--fix` applies confirmed fixes. |
-| `/bosun:review-pr <n \| url>` | The same panel on a GitHub PR, in a separate worktree; posts only text you approve. |
+| `/bosun:review-pr <n \| url>` | The same panel on a GitHub PR, in a separate worktree. Each finding gives its file and line, the problem, its impact and a fix; posted inline, a fix for exactly the commented lines is a GitHub suggestion the author can commit in one click. Posts only text you approve. |
 | `/bosun:investigate <symptom>` | Competing hypotheses tested in parallel, a verified root cause and a report; `--fix` fixes it test-first. |
 | `/bosun:security-audit [--full]` | Attack-surface map, your installed scanners, reviewers per area, verified findings. |
 | `/bosun:commit` | Logical commits in your convention, checked for secrets and leftovers. |

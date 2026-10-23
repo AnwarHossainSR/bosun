@@ -1473,8 +1473,9 @@ def cmd_set(args) -> int:
         board.setdefault("meta", {})["updated_at"] = stamp
         save_board(path, board)
         tick_tasks_md(board, path, ticks)
-    if args.status:
-        print(f"{', '.join(args.ids)} -> {args.status}")
+    if args.status:  # the count lets a build show progress as OpenSpec's apply does ("3/7")
+        finished = sum(1 for t in idx.values() if status_of(t) in FINISHED)
+        print(f"{', '.join(args.ids)} -> {args.status} ({finished}/{len(idx)} tasks finished)")
     else:
         print(f"updated {', '.join(args.ids)}")
     return 0

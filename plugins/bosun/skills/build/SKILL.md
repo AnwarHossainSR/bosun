@@ -22,7 +22,7 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
 
 ## 0. Preflight (stop and ask about anything red)
 
-1. **Board:** the argument (change id, slug, directory or path), else `TB latest`. `TB validate <board>`; OpenSpec plan: also `TB spec-check <board>` and, with the CLI (from the OpenSpec directory's parent), `OPENSPEC_TELEMETRY=0 openspec validate <id> --strict --no-interactive`. Errors mean stop.
+1. **Board:** the argument (change id, slug, directory or path), else `TB latest`. A change id with a change directory (`<openspec_dir>/changes/<id>/`) but no board yet: run the `bosun:plan` skill with that id first (it adds only the board, and asks for approval), then continue here. `TB validate <board>`; OpenSpec plan: also `TB spec-check <board>` and, with the CLI (from the OpenSpec directory's parent), `OPENSPEC_TELEMETRY=0 openspec validate <id> --strict --no-interactive`. Errors mean stop.
 2. **Settings:** `.bosun/config.json`; defaults when absent: `build.max_parallel` 4, `isolation` worktree, `review` task, `security_review` sensitive, `max_attempts` 2, `merge` merge. Flags override. Note `commands` (install, test, lint, typecheck, build).
    **Route:** `TB route <board> --json` (pass `--only` on): `solo`, one implementer for the tasks in `order`, then one review and one merge; or `crew`, parallel agents (`reasons` says why). `--crew` forces the crew, `--solo` solo when `solo_ok` is true (otherwise say why and use the crew). Solo needs worktree mode; shared mode uses the crew. Resuming with tasks `in_progress` or `review`: the route stays `meta.route` (unset: crew) whatever the flags; tasks in review (`in_review`) are left out of `order`, because their gates come first (step 4). `stuck` or `none`: still do steps 3 and 4, then section 3 or 4.
 3. **Git** (worktree mode):
@@ -36,6 +36,8 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
 5. **Confirm:** tasks remaining, resume decisions (including an unfinished merge, worktrees no task claimed, uncommitted paths outside a task), the route (solo: its order; crew: the `TB waves <board> --parallel <N>` summary and parallelism), isolation, review policy, work branch. Get a go-ahead before starting any agent unless the user already approved this build; an unfinished merge always needs one. `--dry-run`: also print the first prompt (crew: the first wave's) and `TB brief` for one of its tasks, then stop. Otherwise record the route: `TB meta <board> --set route=<solo|crew>` (briefs and the monitor read it).
 
 ## 1. Run the tasks
+
+**Progress,** as OpenSpec's apply shows it: when tasks start, a line each, `▶ <ID> <title>` (solo: the run's list); when one is recorded done (section 2, step 8, and report tasks), `✓ <ID> <title> · <n>/<m>` with the count `TB set` printed (`3/7 tasks finished`).
 
 **Solo route** (worktree mode): no scheduling; one implementer works through `order`.
 
@@ -67,7 +69,7 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
 2. Mark the tasks to start in one call: `TB set <board> <ids...> --status in_progress --assignee <agent>`.
 3. Launch them **in one message**, one Agent call each: `subagent_type` = the task's agent (`bosun:implementer` unless it says otherwise); `isolation: "worktree"` for code tasks in worktree mode (not for report tasks or shared mode); `name` = the task id in lowercase with dots replaced (`t2-1` for 2.1), so you can message it later; `description` = "2.1 <short title>"; `prompt` = the template below.
 4. Agents run in the background and you're notified as each finishes: process each result at once (section 2) and refill from step 1; don't wait for a whole wave. Foreground agents: process the batch when it returns, then continue.
-5. About every 5 finished tasks print one progress line from `TB status <board>`. About every 10, or after two failures in a row, spawn `bosun:monitor` with the board's absolute path and act on its recommendations.
+5. About every 10 finished tasks, or after two failures in a row, spawn `bosun:monitor` with the board's absolute path and act on its recommendations.
 
 Prompt template (keep it short; bosun agents get the project commands and output style from the startup hook):
 

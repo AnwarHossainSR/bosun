@@ -131,7 +131,8 @@ def parse_ts(value):
 def read_usage(path: Path):
     """One record per API response. A response with several content blocks is written as several lines that share
     its message id; keep the largest counts. A response with no line carrying its stop_reason has only the output
-    count from the start of its stream: `final` is false. A compaction is a system line with the size it summarised."""
+    count from the start of its stream: `final` is false. A compaction is a system line with the size it summarised:
+    an estimate of what the unrecorded compaction call read, kept in `compacted` and out of the counted fields."""
     records, start = {}, None
     try:
         fh = open(path, encoding="utf-8", errors="replace")
@@ -154,7 +155,7 @@ def read_usage(path: Path):
                 if tokens and entry.get("subtype") == "compact_boundary":
                     records[f"compact-{entry.get('uuid') or n}"] = {
                         "ts": parse_ts(entry.get("timestamp")), "model": "", "final": True, "compaction": True,
-                        "input": tokens, "cache_write": 0, "cache_read": 0, "output": 0}
+                        "compacted": tokens, "input": 0, "cache_write": 0, "cache_read": 0, "output": 0}
                 continue
             if '"usage"' not in line or '"assistant"' not in line:
                 continue
@@ -204,7 +205,7 @@ def totals(records):
     out = {f: sum(r[f] for r in records) for f in FIELDS}
     out["total"] = sum(out.values())
     out["output_partial"] = sum(1 for r in records if not r["final"])  # responses whose output is only a lower bound
-    out["compaction"] = sum(r["input"] for r in records if r["compaction"])
+    out["compaction"] = sum(r.get("compacted", 0) for r in records)  # an estimate, not part of the total
     return out
 
 
@@ -291,7 +292,8 @@ def report_lines(res, agents: int):
                      f" · output {out(run['all_output'], run['all_output_partial'])}"
                      f" · new input {human(run['all_input'] + run['all_cache_write'])}"
                      f" · cache reads {human(run['all_cache_read'])}"
-                     + (f" · compaction ~{human(run['all_compaction'])}" if run["all_compaction"] else ""))
+                     + (f" · compaction ~{human(run['all_compaction'])} (estimate, not in the total)"
+                        if run["all_compaction"] else ""))
         top = run["top"]
     else:
         top = res["top"]

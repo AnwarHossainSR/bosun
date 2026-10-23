@@ -506,7 +506,11 @@ class SkillStyleTests(unittest.TestCase):
         words = rule.split(":", 1)[1].strip().rstrip(".")
         skills = sorted((ROOT / "plugins" / "bosun" / "skills").glob("*/SKILL.md"))
         self.assertTrue(skills)
+        aliases = {"propose": "plan", "apply": "build"}  # OpenSpec's names: they run the skill that has the rules
         for path in skills:
+            if path.parent.name in aliases:
+                self.assertIn(f"Invoke the `bosun:{aliases[path.parent.name]}` skill", path.read_text(), path)
+                continue
             style = next((line for line in path.read_text().splitlines() if line.startswith("**Style:**")), "")
             for part in (f"keep logic words ({words})", "destructive steps", "requests to confirm",
                          "statements of uncertainty", "never drop a fact or an uncertainty label"):

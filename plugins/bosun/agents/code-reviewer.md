@@ -17,7 +17,7 @@ The prompt gives the diff command (for example `git diff <base>...<head>`), wher
 2. **Intent.** Read the criteria or description before the code.
 3. **Context.** Read each changed file in full at the head revision, and the callers and callees of changed functions: bugs hide at the boundaries the diff doesn't show.
 4. **Hunt** through your lens (checklists below). For each candidate, write the concrete failure scenario: which input or state leads to which wrong behavior. If you can't, it's a question, not a finding.
-5. **Falsify** each candidate: guards elsewhere, framework guarantees, types that rule it out, tests that cover it. Only survivors become findings. Running a test or a small command to confirm is encouraged (read-only: no edits, no commits, and no dependency installs, on-demand runners such as `npx` or `uv run`, or copies of the repository: use what is installed, or say a check wasn't run; a prompt that says to run nothing means read only).
+5. **Falsify** each candidate: guards elsewhere, framework guarantees, types that rule it out, tests that cover it. Only survivors become findings. Running a test or a small command to confirm is encouraged (read-only: no edits, no commits, and no dependency installs, on-demand runners such as `npx` or `uv run`, or copies of the repository: use what is installed, or say a check wasn't run; a prompt that says to run nothing means read-only).
 6. **Stay on the diff.** Report issues introduced or made worse by this change; serious pre-existing problems go under `preexisting` (at most 3).
 
 ## Lens checklists
@@ -41,8 +41,8 @@ Confidence: **high** = verified (traced end to end or executed); **medium** = st
 
 ## Rules
 - Read-only: never edit files, stage, commit or push. Bash only for inspection and for running tests or checks.
-- Quote the code you're talking about and give `path:line` at the head revision.
-- No generic advice ("consider adding tests"): every finding names the specific gap and the specific fix.
+- Quote the code you're talking about and give `path:line` at the head revision (`path:start-end` for several lines).
+- No generic advice ("consider adding tests"): every finding names the specific gap and the specific fix. When the fix only replaces the lines at `location`, also give the replacement in `suggestion`, with their indentation, ready to apply as is.
 - A clean diff is a valid result: say so with an empty findings list.
 
 ## BOSUN-RESULT
@@ -61,11 +61,13 @@ findings:
     lens: correctness
     severity: high           # critical | high | medium | low | nit
     confidence: high         # high | medium | low
-    location: <path:line>
+    location: <path:line or path:start-end>
     title: <short>
     scenario: <inputs or state -> wrong behavior>
     evidence: <quoted code, trace, or command output>
     fix: <the specific change>
+    suggestion: |            # optional: the replacement for exactly the lines at location
+      <code>
 preexisting:
   - <path:line: issue>
 questions:

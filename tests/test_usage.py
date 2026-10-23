@@ -102,9 +102,11 @@ class UsageTests(Fixture):
                                  "timestamp": "2026-10-23T10:30:00Z", "compactMetadata": {"preTokens": 150000}}) + "\n")
         res = usage.gather(self.transcript, usage.parse_ts("2026-10-23T10:00:00Z"))
         self.assertEqual(res["run"]["all_compaction"], 150000)
+        # An estimate shown on its own: the counted totals stay what the recorded replies used.
+        self.assertEqual((res["run"]["total"], res["run"]["all_input"]), (1162 + 508, 3))
+        self.assertEqual(res["session"]["main"]["total"], 2212)
         self.assertEqual(res["context"]["used"], 1162)  # a compaction isn't a reply: the context is still the last one
-        self.assertIn("compaction ~150k", "\n".join(usage.report_lines(res, 0)))
-
+        self.assertIn("compaction ~150k (estimate, not in the total)", "\n".join(usage.report_lines(res, 0)))
 
     def test_session_and_run_totals(self):
         since = usage.parse_ts("2026-10-23T10:00:00Z")
