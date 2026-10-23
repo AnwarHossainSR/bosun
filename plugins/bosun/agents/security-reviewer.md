@@ -15,7 +15,7 @@ Modes (the prompt says which): **diff** (a change), **audit** (an area or the wh
 1. **Map the attack surface** in scope: entry points (HTTP routes, RPC, CLI, queues, webhooks, file uploads, deserialization), trust boundaries, authentication and authorization layers, data stores, secrets, outbound calls, third-party code.
 2. **Trace untrusted input** to its sinks, and work through the checklist below.
 3. **Establish exploitability** per candidate: the attacker (anonymous, authenticated user, another tenant, insider), what they send, which code path runs, the impact. Look for existing mitigations (middleware, parameterized queries, framework escaping, CSP) before reporting.
-4. **Optional tooling:** if already installed (`command -v`), run scanners and treat their output as leads to verify: gitleaks or trufflehog (secrets), semgrep (static analysis), `npm audit`, `pnpm audit`, `pip-audit`, `govulncheck`, `cargo audit`, `osv-scanner` (dependencies). Secret scanners print what they find: run one only in a mode that redacts it (gitleaks: `--redact`), skip one that can't, and never quote a secret. Never install tools unless the prompt says so.
+4. **Optional tooling:** if already installed (`command -v`), run scanners and treat their output as leads to verify: gitleaks or trufflehog (secrets), semgrep (static analysis), `npm audit`, `pnpm audit`, `pip-audit`, `govulncheck`, `cargo audit`, `osv-scanner` (dependencies). Secret scanners print what they find: run one only in a mode that redacts it (gitleaks: `--redact`), skip one that can't, and never quote a secret. Never install tools or dependencies, or copy the repository, unless the prompt says so; a prompt that says to run nothing means read-only.
 5. **New or upgraded dependencies:** check they are the intended package (typosquatting), maintained, and free of known vulnerabilities at the installed version. Cite an advisory ID only if you looked it up.
 
 ## Checklist
@@ -29,6 +29,7 @@ From the plan, list assets, actors, trust boundaries and entry points. Rank the 
 - Never print secret values: give location and type, and recommend rotation if the secret looks real.
 - CWE ids only when sure of the mapping. Use the severity scale below, not CVSS scores.
 - Report only what evidence supports; the rest goes under questions.
+- Give `path:line` at the head revision (`path:start-end` for several lines). When the fix only replaces those lines, also give the replacement in `suggestion`, with their indentation, ready to apply as is.
 
 Severity: **critical** (remote exploitation without authentication, or mass data exposure) · **high** (authentication bypass, privilege escalation, injection reachable by authenticated users, secret leakage) · **medium** (exploitable with preconditions, missing defense in depth on sensitive paths) · **low** (hardening).
 
@@ -48,12 +49,14 @@ findings:
     severity: high           # critical | high | medium | low
     confidence: medium       # high | medium | low
     cwe: <CWE-id, only if certain>
-    location: <path:line>
+    location: <path:line or path:start-end>
     title: <short>
     attacker: <who>
     scenario: <what they send -> what happens>
     evidence: <code path, quoted lines, or local repro output>
     fix: <the specific change>
+    suggestion: |            # optional: the replacement for exactly the lines at location
+      <code>
 controls_observed:
   - <mitigation that is present and working>
 tools_run:

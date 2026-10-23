@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-23
+
+### Added
+- A token report at the end of the review, review-pr, security-audit, investigate, plan and build reports, from the new `scripts/usage.py`. It reads Claude Code's own transcript files for the session and its subagents, and shows:
+  - this run's tokens (output, new input and cache reads) and how many agents it started;
+  - the session total with its output;
+  - how much of the context window is left;
+  - for a build, the five agents that used most.
+
+  Agents' output is a lower bound ("≥"), because their transcripts often keep only the first count of a reply. Compactions aren't saved as replies, so they're estimated from their recorded size and shown apart: the totals count only recorded replies. The window comes from `CLAUDE_CODE_MAX_CONTEXT_TOKENS` when you've set it, else from the model (1M for Opus 4.7 and later, Sonnet 5, Haiku 5, Fable and Mythos; 200k for older models), marked "~". Output is written as UTF-8, so a Windows pipe can't break it; the report hasn't been run on Windows yet. Plan limits aren't in those files, so the report points to `/usage`. The lines go only in the last message to you: never in a saved report, SUMMARY.md or a posted PR comment. A skill run by another one (a build's final review) leaves them to the outer skill.
+- Review reports mark severity in color: 🔴 critical, 🟠 high, 🟡 medium, 🔵 low and ⚪ nit. A finding shows ✅ when the verifier confirmed it, ❔ when it was uncertain, and the reviewer's confidence otherwise. Reports open with a verdict heading and a count table, then group findings by severity. `/bosun:review-pr` drafts and posts in the same layout: one comment, or a body plus one inline comment per finding. `/bosun:security-audit` uses it with the overall risk as the heading.
+- Every review finding names its file and line (`path:start-end` for several lines), then the problem, its impact and the fix. Reviewers add a `suggestion` with the exact replacement code when the fix only changes those lines. `/bosun:review-pr` links each location to the line at the PR's head commit and recommends posting inline when findings sit on lines the diff shows; there, a fix that replaces exactly the commented lines is posted as a GitHub suggestion, which the author can commit in one click. Before posting it checks that the PR's head hasn't moved since the review.
+- `/bosun:propose` and `/bosun:apply`, OpenSpec's names for `/bosun:plan` and `/bosun:build`; the old names still work. A build shows its progress as OpenSpec's apply does: `▶ 1.2 <title>` when a task starts and `✓ 1.2 <title> · 3/7` when it's done (`TB set` now prints the count). Given an OpenSpec change that has no task board yet, the build first has the architect add the board, with your approval.
+
+### Changed
+- Reviews always leave lockfiles and files marked `linguist-generated` out of their size and of the reviewers' diffs, including lockfiles in monorepo subfolders. A changed lockfile, or a new one git doesn't track yet, adds the security lens, and one security reviewer gets those files alone, for supply-chain checks. `/bosun:review-pr` and the build's review gates do the same.
+  - This used to depend on the session. In one run on a pull request whose `pnpm-lock.yaml` was 1,379 of 1,849 added lines, it kept the lockfile away from three reviewers on its own.
+- Reviewers and verifiers no longer install dependencies, use on-demand runners such as `npx` or `uv run`, or copy the repository. A check that needs more is reported as not run. When an install matters, it happens once, with the lockfile frozen.
+- `/bosun:review-pr` asks you once before running a PR's code (installs, tests, scripts). It recommends yes only for a same-repository PR that doesn't change dependencies, and without a yes its agents only read files.
+
 ## [0.5.1] - 2026-10-22
 
 ### Fixed

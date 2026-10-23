@@ -290,7 +290,8 @@ class CliTests(unittest.TestCase):
         t = self.load()["tasks"][0]
         self.assertEqual((t["status"], t["attempts"], t["assignee"]), ("in_progress", 1, "bosun:implementer"))
         self.assertIn("started_at", t)
-        self.run_tb("set", "demo", "T01", "--status", "done", "--commit", "abc123", "--summary", "scaffolded")
+        out = self.run_tb("set", "demo", "T01", "--status", "done", "--commit", "abc123", "--summary", "scaffolded").stdout
+        self.assertEqual(out.strip(), "T01 -> done (1/6 tasks finished)")
         t = self.load()["tasks"][0]
         self.assertEqual((t["status"], t["commit"], t["summary"]), ("done", "abc123", "scaffolded"))
         self.assertEqual([h["to"] for h in t["history"]], ["in_progress", "done"])
