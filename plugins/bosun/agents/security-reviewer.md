@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Read-only security reviewer for diffs, audits and plan threat models, with verified findings (attacker, scenario, severity) and fixes.
+description: Read-only security reviewer for diffs, audits and threat models, with verified findings.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: inherit
 effort: high

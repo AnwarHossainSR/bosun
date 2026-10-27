@@ -40,20 +40,20 @@ claude plugin install bosun@bosun-marketplace
 |---|---|
 | `.claude-plugin/marketplace.json` | The marketplace that lists the plugin |
 | `plugins/bosun/.claude-plugin/plugin.json` | Plugin manifest (name, version) |
-| `plugins/bosun/skills/<name>/SKILL.md` | User-facing workflows (`/bosun:<name>`); `build/reference/execution.md` holds the build's edge cases |
+| `plugins/bosun/skills/<name>/SKILL.md` | User-facing workflows (`/bosun:<name>`). Text only some runs need lives in `reference/` beside it and is read on demand: the build's edge cases and crew route, the review's `--fix` |
 | `plugins/bosun/agents/<name>.md` | Subagent definitions (`bosun:<name>`) |
 | `plugins/bosun/scripts/taskboard.py` | Task board CLI used by the skills (standard library only) |
 | `plugins/bosun/scripts/usage.py` | Token report from Claude Code's transcript files, for the end of every report (standard library only) |
 | `plugins/bosun/hooks/` | Guard, activity log, result saving and context injection for bosun agents |
-| `plugins/bosun/templates/config.json` | Template for a project's `.bosun/config.json` |
+| `plugins/bosun/templates/` | Template for a project's `.bosun/config.json`, and the classic PLAN.md outline |
 | `tests/` | Unit tests for the task board and the hooks |
 | `examples/` | Example plans: `taskflow-40` (classic PLAN.md) and `openspec-todo-api` (OpenSpec change + board) |
-| `docs/` | Images used by the README |
+| `docs/` | The guide and the README's diagram |
 
 ## Guidelines
 
 **Prompts (skills and agents)**
-- Keep instructions specific and checkable. Every agent ends with a `# BOSUN-RESULT` block; if you change its keys, update the parser in `hooks/bosun_hooks.py` and the tests.
+- Keep instructions specific and checkable. Every word of a SKILL.md or agent file is paid for each time it loads, and a skill stays in the session's context: put text that only some runs need in a `reference/` file the skill reads when that path runs, and check the change with `claude plugin details bosun`. Every agent ends with a `# BOSUN-RESULT` block; if you change its keys, update the parser in `hooks/bosun_hooks.py` and the tests.
 - Keep the honesty rules: agents report only checks they ran, cite `path:line`, and mark unverified claims.
 - Don't add instructions that depend on a tool or setting unless you've checked it exists in current Claude Code. Link the docs in your PR.
 - Keep `SKILL.md` files under about 500 lines; move rarely needed detail into a `reference/` file.

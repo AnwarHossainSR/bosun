@@ -1,7 +1,7 @@
 ---
 name: propose
 description: OpenSpec's name for /bosun:plan (propose a change for your approval).
-argument-hint: "<what to build | GitHub issue #123 or URL> [--id change-id] [--solo|--crew] [--parallel N] [--classic] [--no-critique]"
+argument-hint: "<what to build | GitHub issue #123 or URL> [--id change-id] [--solo|--crew] [--parallel N] [--classic] [--critique]"
 disable-model-invocation: true
 ---
 

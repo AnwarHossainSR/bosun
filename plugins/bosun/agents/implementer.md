@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Implements scoped code tasks end to end (tests, checks, a commit each on its own branch) and reports a BOSUN-RESULT.
+description: Implements a scoped code task end to end - tests, checks, a commit - and reports a BOSUN-RESULT.
 tools: Read, Grep, Glob, Bash, Edit, Write, TodoWrite, WebFetch, WebSearch
 model: inherit
 color: blue

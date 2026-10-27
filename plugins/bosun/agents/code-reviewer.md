@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Read-only reviewer of a diff through one or more lenses (correctness, spec, design, performance, tests, accessibility, api-compat), with evidence-backed findings.
+description: Read-only diff reviewer through one or more lenses, with evidence-backed findings and fixes.
 tools: Read, Grep, Glob, Bash
 model: inherit
 effort: high

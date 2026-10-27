@@ -1,6 +1,6 @@
 ---
 name: manager
-description: Route any software goal (feature, bug, refactor, migration, review, audit, docs, research) to the lightest bosun workflow, with parallel agents and review gates. Use to orchestrate agents.
+description: Route any software goal (feature, bug, refactor, migration, review, audit, docs) to the lightest bosun workflow. Use to orchestrate agents.
 argument-hint: "<goal in plain words> [--parallel N]"
 ---
 

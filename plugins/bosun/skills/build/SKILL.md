@@ -1,6 +1,6 @@
 ---
 name: build
-description: Run a bosun plan, solo or with parallel agents in git worktrees, with review-gated merges, tasks.md kept in step and resume. Use after /bosun:plan, for a task board, or to resume a build.
+description: Run a bosun plan solo or with parallel agents in worktrees, with review-gated merges and resume. Use after /bosun:plan or to resume a build.
 argument-hint: "[change-id|plan-slug|board-path] [--solo|--crew] [--parallel N] [--isolation worktree|shared] [--review task|batch|final] [--resume] [--only 1.1,2.3] [--dry-run]"
 ---
 
@@ -18,7 +18,7 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
 
 **Local OpenSpec directory:** one git ignores (`git check-ignore -q <openspec_dir>/changes` succeeds), such as `.bosun/openspec` beside a project's own OpenSpec. Its files never go into git: follow the *local* notes, which skip those git steps. Worktrees don't contain it; agents read the change from the main checkout via the absolute paths in `TB brief`.
 
-**Tokens:** before anything else, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py" start` and note the `mark:` it prints. At the end, run it with `report --since <mark> --agents 5` and end step 7's message with its lines as printed, never in a file you write or text you post. If the script fails, say so in one line.
+**Tokens:** before anything else, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py" start` and note the `mark:` it prints. Its context above about 100k: tell the user once that every turn of the build re-reads it, so a fresh session (`/clear`; the board is on disk) is cheaper, then continue unless they stop you. At the end, run it with `report --since <mark> --agents 5` and end step 7's message with its lines as printed, never in a file you write or text you post. If the script fails, say so in one line.
 
 ## 0. Preflight (stop and ask about anything red)
 
@@ -63,31 +63,13 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
    - Clean up: every worktree and branch of the run (each continuation's supersedes the earlier ones).
 4. **Then:** tasks pending again or added meanwhile (follow-ups via `TB add`): `TB route` for them, `TB meta <board> --set route=<route>`, and run them on that route. With `--only`, pass it on, adding the ids of tasks added to finish listed work (a split, a fix for a critical or high finding); other unlisted tasks, medium follow-ups included, wait for a later build, as on the crew route. Section 4 starts only when nothing is pending (with `--only`: no listed task is).
 
-**Crew route** (rolling pool), until nothing is pending or in flight:
-
-1. `TB next <board> --parallel <N> --json` (shared mode: add `--strict-files`): tasks whose deps are finished and whose files don't overlap work in flight, critical path first; keep each task's agent, kind, risk, spec_refs and security_sensitive for its gate. With `--only`, pass it on (`--only 1.1,2.3`): unlisted tasks then never take a slot, and the loop ends once the listed ones are finished. `stuck: true`: section 3.
-2. Mark the tasks to start in one call: `TB set <board> <ids...> --status in_progress --assignee <agent>`.
-3. Launch them **in one message**, one Agent call each: `subagent_type` = the task's agent (`bosun:implementer` unless it says otherwise); `isolation: "worktree"` for code tasks in worktree mode (not for report tasks or shared mode); `name` = the task id in lowercase with dots replaced (`t2-1` for 2.1), so you can message it later; `description` = "2.1 <short title>"; `prompt` = the template below.
-4. Agents run in the background and you're notified as each finishes: process each result at once (section 2) and refill from step 1; don't wait for a whole wave. Foreground agents: process the batch when it returns, then continue.
-5. About every 10 finished tasks, or after two failures in a row, spawn `bosun:monitor` with the board's absolute path and act on its recommendations.
-
-Prompt template (keep it short; bosun agents get the project commands and output style from the startup hook):
-
-```
-Task <ID> of bosun plan "<plan title>". Read your brief first: <TB> brief <absolute board path> <ID>
-Mode: <worktree: your own git worktree on your own branch, created from the work branch "<work_branch>". Commit there. Never push.
-      | shared: the main checkout, with other agents. Edit only your owned files. Don't stage or commit.>
-Main checkout (read-only reference): <absolute path>
-<retries only: what went wrong last time and what to do differently>
-```
-
-An agent from outside bosun (the user's `.claude/agents/` or another plugin) gets neither the hook nor bosun's instructions: paste the brief and the project commands into its prompt and ask it to end with a `# BOSUN-RESULT` block (task, status, summary, branch, worktree, commit, spec_gaps).
+**Crew route** (rolling pool): read `${CLAUDE_PLUGIN_ROOT}/skills/build/reference/crew.md` and follow it until nothing is pending or in flight.
 
 ## 2. Per-task pipeline
 
 1. **Result:** `done` continues. `partial`, `failed`, `blocked`, `needs_input` or no result block: section 3. Collect `spec_gaps` for the final report; a gap that blocks correctness goes to the user before more dependent tasks start.
 2. **Spot-check** (code tasks, worktree mode): `git log --oneline <work_branch>..<task_branch>` shows its commits; `git diff --stat <work_branch>...<task_branch>` touches only expected files (never the OpenSpec directory, nor a project's own `openspec/`). List uncommitted paths with `git -C <worktree> status --porcelain --untracked-files=all`; those that belong to the task: commit them there with path-limited commands (`git -C <worktree> add -- <paths>`, then `git -C <worktree> commit -m "<type>(<ID>): <summary>" -- <paths>`), then repeat the `--stat` check; leave other uncommitted paths alone and note them. Out-of-scope files: accept with a note, or send the task back. Then `TB set <board> <ID> --status review --branch <task_branch> --worktree <path>`.
-3. **Gate** (review policy `task`; `batch` and `final`: reference). Lenses: `correctness`; `spec` for a task with `spec_refs`; `tests` when its risk is high. A diff under about 200 changed lines (`git diff --shortstat <work_branch>...<task_branch>`; shared mode: `git diff --shortstat -- <task files>` plus the lines of its untracked files) gets one `bosun:code-reviewer` for all its lenses, a larger one a reviewer per lens. In the same message add `bosun:security-reviewer` in `diff` mode when the task is `security_sensitive`, `security_review` is `always`, or (policy `sensitive`) the diff touches auth, sessions, crypto, input parsing, queries, file or network I/O, permissions, secrets or config, or dependencies. Size and the reviewers' diff commands leave out lockfiles and generated files with the pathspecs in step 1 of `${CLAUDE_PLUGIN_ROOT}/skills/review/SKILL.md` (read it once); a changed lockfile adds the security-reviewer, which gets it. Each reviewer gets `<TB> brief <absolute board path> <ID>` (batch: every ID in the batch), the diff command `git diff <work_branch>...<task_branch> -- <pathspecs>`, the worktree path for full files, and its lens or lenses.
+3. **Gate** (review policy `task`; `batch` and `final`: reference). Lenses: `correctness`; `spec` for a task with `spec_refs`; `tests` when its risk is high. A diff under about 400 changed lines (`git diff --shortstat <work_branch>...<task_branch>`; shared mode: `git diff --shortstat -- <task files>` plus the lines of its untracked files) gets one `bosun:code-reviewer` for all its lenses, a larger one a reviewer per lens. In the same message add `bosun:security-reviewer` in `diff` mode when the task is `security_sensitive`, `security_review` is `always`, or (policy `sensitive`) the diff touches auth, sessions, crypto, input parsing, queries, file or network I/O, permissions, secrets or config, or dependencies. Size and the reviewers' diff commands leave out lockfiles and generated files (`linguist-generated`) with these pathspecs, last and after `--`: `':(exclude,glob,top)**/*.lock' ':(exclude,glob,top)**/*-lock.yaml' ':(exclude,glob,top)**/package-lock.json' ':(exclude,glob,top)**/npm-shrinkwrap.json' ':(exclude,glob,top)**/bun.lockb' ':(exclude,glob,top)**/go.sum' ':(exclude,top,attr:linguist-generated)' ':(exclude,top,attr:linguist-generated=true)'`. A changed lockfile (the same names with `:(glob,top)` and `--name-only`) adds the security-reviewer, which gets a diff of those files. Each reviewer gets `<TB> brief <absolute board path> <ID>` (batch: every ID in the batch), the diff command `git diff <work_branch>...<task_branch> -- <pathspecs>`, the worktree path for full files, and its lens or lenses.
 4. **Decide:** blocking = critical or high severity with medium or high confidence; have `bosun:verifier` check a doubtful one first. Medium: fix in the same round if cheap, else a follow-up task via `TB add` (OpenSpec plan: a tasks.md id such as `5.1`; TB adds the tasks.md line). Low and nit: record only.
 5. **Fix round** (two per task at most, then treat it as `blocked`): send the confirmed blocking findings to the same implementer with SendMessage (`to` = its name) to fix in its worktree, commit and report again. Can't be resumed: spawn a new implementer (worktree) whose prompt starts with "First run `git merge <task_branch>` to pick up the previous attempt", then the findings. Re-run only the reviewers that blocked.
 6. **Merge without committing** (you, main checkout, work branch). First check nothing is pending: `git rev-parse -q --verify MERGE_HEAD` fails, `SQUASH_MSG` doesn't exist, `git diff --cached --quiet` passes; otherwise stop, because a squash merge would stack on the leftovers and commit them under this task. Then `git merge --no-ff --no-commit <task_branch>`, or `git merge --squash <task_branch>` if `build.merge` is `squash`. Conflict: `git merge --abort` (after a squash, `git reset --merge`), then the reference, "Conflicts". Shared mode has no branch: reference, "Shared mode".

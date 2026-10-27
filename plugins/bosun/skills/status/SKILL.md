@@ -1,6 +1,6 @@
 ---
 name: status
-description: Show a bosun build's progress, in-flight and blocked tasks and next steps; --audit adds a health check. Use when asked about build status or progress.
+description: Show a bosun build's progress, blocked tasks and next steps; --audit adds a health check. Use for build status.
 argument-hint: "[plan-slug|board-path] [--audit]"
 ---
 

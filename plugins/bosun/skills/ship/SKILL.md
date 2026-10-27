@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Final gate (lint, types, tests, build, quick review), push, and a PR from the repository's template. Runs only when you invoke it; asks before pushing.
+description: Final checks, push and a pull request from the repository's template; asks before pushing.
 argument-hint: "[--base <branch>] [--draft] [--no-review] [--title \"...\"]"
 disable-model-invocation: true
 ---

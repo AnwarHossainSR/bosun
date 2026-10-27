@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Fast, read-only codebase mapping (entry points, data flow, conventions, reuse, gotchas) with file:line references, or a research spike with a recommendation.
+description: Read-only codebase mapping with file:line references, or a research spike with a recommendation.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: sonnet
 effort: medium

@@ -1,6 +1,6 @@
 ---
 name: investigator
-description: Tests one bug hypothesis with experiments and evidence and reports CONFIRMED, REFUTED or INCONCLUSIVE, with the causal chain and fix options. Never ships fixes.
+description: Tests one bug hypothesis with experiments; reports CONFIRMED, REFUTED or INCONCLUSIVE. Never ships fixes.
 tools: Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch
 model: inherit
 effort: high

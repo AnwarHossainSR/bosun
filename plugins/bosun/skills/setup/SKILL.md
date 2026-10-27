@@ -1,6 +1,6 @@
 ---
 name: setup
-description: One-time bosun setup - detect commands, OpenSpec and conventions, write .bosun/config.json, keep .bosun/ out of git, check the worktree setting.
+description: One-time bosun setup - detect commands, write .bosun/config.json, keep .bosun/ out of git.
 argument-hint: "[--force]"
 disable-model-invocation: true
 ---

@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-27
+
+### Changed
+- **Plans are lean by default, security-sensitive ones included,** as OpenSpec's propose is: one architect writes the plan, with no scouts, critique or threat model. Before, auth, sessions, input parsing and the like forced a full plan. In one real run, a sign-in page with a mock session token got a design, a critique and a threat model (the agent map showed about 485k tokens across the three) and a 14-task board. Now:
+  - the architect writes the failure and authorization scenarios itself, keeps a lean board within the solo limits (at most 8 tasks), finds code with Grep and Glob, and needs a reason to read far more than about 20 files;
+  - a critique and threat model run only with `--critique` or `--crew`, or when you ask for one at approval, which names the security-sensitive tasks and offers it;
+  - the build's security review still checks security-sensitive tasks;
+  - scouts run only for large work (a new product, or several subsystems at once) or with `--crew`;
+  - the plan skill reads only the repository's overview itself and leaves the code to the architect;
+  - the architect plans only the requested scope. Infrastructure, secrets, hardening and follow-ups the request doesn't ask for become one-line open questions, and their code isn't read.
+- `/bosun:propose` and `/bosun:apply` say once when the session's context is over about 100k tokens, because every later turn re-reads it and a fresh session is cheaper.
+- Lower token use, measured with `claude plugin details bosun` (estimates):
+  - **Always-on:** about 1,420 → 1,021 tokens per session, from shorter skill and agent descriptions.
+  - **Builds:** the build skill is about 8.8k → 8.2k tokens. Its review gates no longer load the whole review skill (about 3k tokens) to get the lockfile pathspecs: the build carries its own copy, and a test keeps the two lists equal. The crew route moved to `reference/crew.md`, read only by crew builds.
+  - **Reviews:** the review skill is about 3.4k → 3.0k tokens, because `--fix` moved to `reference/fix.md`, read only with `--fix`. `/bosun:review-pr` reads it too, and now fetches existing comments with their bodies cut to 300 characters, since review bots post long ones.
+  - **Plans:** the architect is about 4.1k → 3.9k tokens per spawn; the classic PLAN.md outline moved to `templates/PLAN.md`.
+  - **Fewer agents:** one reviewer now covers every lens but security for a diff of up to about 600 changed lines (was 300), and a build gate up to about 400 (was 200). Each extra reviewer read the same diff and files again. `/bosun:investigate` checks a hypothesis it can settle with one quick command itself, and starts at most 3 investigators.
+- The README is shorter: highlights, quick start, commands and install. The details moved to [docs/guide.md](docs/guide.md).
+
+### Added
+- Install steps for a new repository in the README: prerequisites, the three install scopes, setup, check, update and remove.
+- A workflow, `sync-dev-after-main-merge.yml`, that brings `dev` up to date after a pull request merges into `main`. When `dev` has no work of its own, it resets `dev` onto `main`; otherwise it merges `main` into `dev`, and fails on a conflict.
+
 ## [0.6.0] - 2026-10-23
 
 ### Added

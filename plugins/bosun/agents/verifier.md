@@ -1,6 +1,6 @@
 ---
 name: verifier
-description: Skeptical, read-only checker of claims (findings, done reports, acceptance, root causes) that returns CONFIRMED, REFUTED or UNCERTAIN with evidence.
+description: Skeptical read-only checker of claims; returns CONFIRMED, REFUTED or UNCERTAIN with evidence.
 tools: Read, Grep, Glob, Bash
 model: inherit
 effort: high

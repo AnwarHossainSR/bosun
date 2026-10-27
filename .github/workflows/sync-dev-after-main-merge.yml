@@ -1,0 +1,67 @@
+name: Sync dev with main
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  sync-dev:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Sync dev with main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main dev
+
+          git checkout -B dev origin/dev
+
+          # After a squash merge, main carries dev's work as one new commit
+          # while dev still holds the originals, so the two branches share no
+          # tip and `--ff-only` can never succeed - which is how this job used
+          # to fail on every release. The question that decides what to do is
+          # whether dev holds anything main does not:
+          #
+          #   trees already match      -> the merge landed everything.
+          #   dev matches the base     -> dev is simply behind main; the PR
+          #                               that just merged came from somewhere
+          #                               else and dev has no work of its own.
+          #
+          # Either way dev has nothing to lose, so point it at main. Only when
+          # dev has changes of its own since the merge base is a merge needed,
+          # and a conflict there fails the job loudly rather than discarding
+          # anything.
+          base=$(git merge-base origin/main origin/dev)
+
+          if git diff --quiet origin/main origin/dev; then
+            echo "dev and main hold the same tree; resetting dev onto main"
+            reset=1
+          elif git diff --quiet "$base" origin/dev; then
+            echo "dev holds nothing beyond the merge base; resetting dev onto main"
+            reset=1
+          else
+            reset=0
+          fi
+
+          if [ "$reset" = "1" ]; then
+            git reset --hard origin/main
+            git push --force-with-lease origin dev
+          else
+            echo "dev carries work main does not; merging main into dev"
+            git merge origin/main --no-edit
+            git push origin dev
+          fi

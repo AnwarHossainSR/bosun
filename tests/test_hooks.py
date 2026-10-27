@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -515,6 +516,23 @@ class SkillStyleTests(unittest.TestCase):
             for part in (f"keep logic words ({words})", "destructive steps", "requests to confirm",
                          "statements of uncertainty", "never drop a fact or an uncertainty label"):
                 self.assertIn(part, style, path.parent.name)
+
+
+class PromptConsistencyTests(unittest.TestCase):
+    def test_build_and_review_leave_out_the_same_files(self):
+        # The build's gate carries its own copy so it never loads the whole review skill for one list.
+        skills = ROOT / "plugins" / "bosun" / "skills"
+        pattern = re.compile(r"`(':\(exclude,glob,top\)[^`]*)`")
+        review = pattern.findall((skills / "review" / "SKILL.md").read_text())
+        build = pattern.findall((skills / "build" / "SKILL.md").read_text())
+        self.assertEqual(len(review), 1)
+        self.assertEqual(build, review)
+
+    def test_files_skills_read_on_demand_exist(self):
+        plugin = ROOT / "plugins" / "bosun"
+        for path in sorted(plugin.glob("skills/*/SKILL.md")) + sorted(plugin.glob("agents/*.md")):
+            for rel in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/([\w./-]+\.(?:md|json|py))", path.read_text()):
+                self.assertTrue((plugin / rel).is_file(), f"{path.name}: {rel}")
 
 
 if __name__ == "__main__":
