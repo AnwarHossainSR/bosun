@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-10-27
+## [0.6.1] - 2026-10-27
 
 ### Changed
 - **Plans are lean by default, security-sensitive ones included,** as OpenSpec's propose is: one architect writes the plan, with no scouts, critique or threat model. Before, auth, sessions, input parsing and the like forced a full plan. In one real run, a sign-in page with a mock session token got a design, a critique and a threat model (the agent map showed about 485k tokens across the three) and a 14-task board. Now:
