@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Turn current changes into clean commits in the repository's convention, after checks for secrets and leftovers; commits after you confirm, never pushes. Use when asked to commit.
+description: Turn current changes into commits in the repository's convention after secret and leftover checks; never pushes. Use when asked to commit.
 argument-hint: "[hint about the change] [--yes] [--amend]"
 ---
 

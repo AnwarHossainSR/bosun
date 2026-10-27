@@ -1,6 +1,6 @@
 ---
 name: archive
-description: Archive a finished OpenSpec change into the main specs after checks; commits, or backs up a git-ignored OpenSpec directory, after you confirm. Runs only when you invoke it.
+description: Archive a finished OpenSpec change into the main specs, after checks and your confirmation.
 argument-hint: "[change-id] [--yes]"
 disable-model-invocation: true
 ---

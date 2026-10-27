@@ -48,8 +48,8 @@
   <text class="t m" x="444" y="76" font-size="12.5">picks the lightest workflow for the goal</text>
 
   <text class="t m" x="812" y="50" font-size="12.5">or call any stage directly:</text>
-  <text class="t mono" x="812" y="71" font-size="12.5">/bosun:plan</text>
-  <text class="t mono" x="926" y="71" font-size="12.5">/bosun:build</text>
+  <text class="t mono" x="812" y="71" font-size="12.5">/bosun:propose</text>
+  <text class="t mono" x="926" y="71" font-size="12.5">/bosun:apply</text>
   <text class="t mono" x="812" y="90" font-size="12.5">/bosun:review</text>
   <text class="t mono" x="926" y="90" font-size="12.5">/bosun:ship</text>
 

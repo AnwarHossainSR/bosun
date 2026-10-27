@@ -1,7 +1,7 @@
 {
   "name": "bosun",
   "displayName": "bosun",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A multi-agent software delivery crew for Claude Code: a manager skill that plans spec-first (OpenSpec-format changes with testable scenarios), builds with one implementer or in parallel git worktrees, sized to the plan, reviews, security-audits, investigates, commits and ships, using ten specialist agents, a deterministic task board, terse agent reports, and safety hooks scoped to its own agents.",
   "author": {
     "name": "AnwarHossainSR",

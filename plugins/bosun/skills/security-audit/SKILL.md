@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: Security review of this branch's changes, or the whole codebase with --full, by parallel security agents, with verified findings and fixes. Use before shipping sensitive changes.
+description: Security review of this branch, or the whole codebase with --full, with verified findings. Use before shipping sensitive changes.
 argument-hint: "[--full | <base>...<head>] [--areas auth,input,data,deps-infra] [--fix]"
 ---
 
@@ -39,7 +39,7 @@ Every critical and high finding, and any medium one with low confidence, goes to
 
 ## 5. Report
 
-Write `.bosun/reviews/<YYYY-MM-DD>-security.md`, and show the user, in the review skill's step 6 layout: overall risk as the heading (🔴, 🟠, 🟡 or 🔵 with the level; `## ✅ No findings` when there are none), the count table without nits, findings by severity (`path:line`, attacker, scenario, impact, the fix with the reviewer's `suggestion` as a code block when it gave one, CWE when certain, and the verification: ✅ or ❔ from the verifier, else the reviewer's confidence); controls that work; a hardening backlog; tools that ran and tools that weren't available. Never include secret values: location and type only, and tell the user to rotate anything that looks real.
+Write `.bosun/reviews/<YYYY-MM-DD>-security.md`, and show the user, in the review layout (markers 🔴 critical · 🟠 high · 🟡 medium · 🔵 low): overall risk as the heading (its marker and level; `## ✅ No findings` when there are none), a one-row count table without nits, findings under `### <marker> <Severity>` headings, most severe first (`path:line`, attacker, scenario, impact, the fix with the reviewer's `suggestion` as a code block when it gave one, CWE when certain, and the verification: ✅ or ❔ from the verifier, else the reviewer's confidence); controls that work; a hardening backlog; tools that ran and tools that weren't available. Never include secret values: location and type only, and tell the user to rotate anything that looks real.
 
 ## 6. --fix
 

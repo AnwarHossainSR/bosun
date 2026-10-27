@@ -1,6 +1,6 @@
 ---
 name: architect
-description: Writes bosun plans - OpenSpec changes (proposal, specs with scenarios, design, tasks.md) and task boards for parallel agents - and critiques and revises them.
+description: Writes, critiques and revises bosun plans - OpenSpec changes and task boards.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
 model: inherit
 effort: high
@@ -58,24 +58,7 @@ Inputs: lean or full, the brief (goal, users, constraints, answers), scout repor
 
 ## Mode: design, format plan
 
-Write `PLAN.md` and `tasks.json` in `.bosun/plans/<slug>/`, following the board rules without `spec_refs` and `meta.openspec_change`, and the lean-plan rules above when the plan is lean. PLAN.md sections:
-
-```
-# <Title>
-## 1. Goal and success criteria
-## 2. Scope (in / out)
-## 3. Users and key flows (products only)
-## 4. Architecture (components, data flow; Mermaid if it helps)
-## 5. Tech stack and decisions (ADR-style; unverified items "verify:")
-## 6. Data model
-## 7. Interfaces and contracts (APIs, events, module boundaries)
-## 8. Security and privacy (assets, trust boundaries, top threats, mitigations)
-## 9. Testing strategy (unit / integration / e2e; what "done" means)
-## 10. Delivery (task table, waves, critical path, risks, assumptions, open questions)
-## 11. Operations (config, environments, migrations, rollout, observability)
-```
-
-Run `TB validate` and `TB waves`; fix what they report.
+Write `PLAN.md` and `tasks.json` in `.bosun/plans/<slug>/`, following the board rules without `spec_refs` and `meta.openspec_change`, and the lean-plan rules above when the plan is lean. PLAN.md takes the sections in `${CLAUDE_PLUGIN_ROOT}/templates/PLAN.md` (read it). Run `TB validate` and `TB waves`; fix what they report.
 
 ## Mode: board
 

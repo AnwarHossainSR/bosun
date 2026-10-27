@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Review a GitHub pull request with the bosun lens panel in a separate worktree; posts only after you approve the exact text. Use when given a PR number or URL.
+description: Review a GitHub pull request with the bosun lens panel; posts only text you approve. Use when given a PR number or URL.
 argument-hint: "<pr-number | pr-url> [--post] [--lenses ...]"
 ---
 
@@ -18,7 +18,7 @@ Needs the GitHub CLI: `gh auth status` must succeed; if not, explain `gh auth lo
 
 - `gh pr view <pr> --json number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,isCrossRepository,headRepositoryOwner,additions,deletions,changedFiles,files,commits,labels,reviewDecision,statusCheckRollup,url`
 - Size from the fields above (`additions`, `deletions`, `changedFiles`, `files`). Under about 300 changed lines, read the diff (`gh pr diff <pr>`) to pick lenses. Larger: don't read the whole diff (the reviewers do, and it would fill your context); after step 2, find content triggers for lenses (`security` above all) with `git diff <merge-base>...bosun/pr-<number> --name-only -G'<trigger regex>'` (fetch failed: grep the saved diff), or open those files' diffs. Unsure whether `security` applies: include it. A very large PR: tell the user and split the review by area.
-- Existing review comments, so you don't repeat them: `gh api repos/{owner}/{repo}/pulls/<number>/comments --paginate`
+- Existing review comments, so you don't repeat them, cut short because bots post long ones: `gh api repos/{owner}/{repo}/pulls/<number>/comments --paginate --jq '.[] | {path, line, user: .user.login, body: .body[0:300]}'`
 - Issues linked in the description (`gh issue view <n>`), for intent.
 
 ## 2. Check out without touching the user's work

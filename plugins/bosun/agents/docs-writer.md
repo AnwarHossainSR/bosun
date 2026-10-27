@@ -1,6 +1,6 @@
 ---
 name: docs-writer
-description: Updates READMEs, guides, CHANGELOGs, ADRs and comments to match the code, running the documented commands it safely can.
+description: Updates READMEs, guides, CHANGELOGs and comments to match the code.
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: sonnet
 effort: medium

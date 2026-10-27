@@ -1,0 +1,7 @@
+# bosun review: --fix
+
+The review skill's step 7, read only when `--fix` was given.
+
+Fixes land in the working tree, so every file a fix touches must hold exactly the reviewed code there. The default target and `working` always do. `staged`: the index must still be the reviewed one (`git write-tree` equals the tree recorded in the report) and the file must have no unstaged changes (not in `git diff --name-only`). A range or commit: its head must be `HEAD` (`git rev-parse <head>^{commit}` equals `git rev-parse HEAD`; `^{commit}` makes annotated tags compare as their commit) and the file must have no uncommitted changes (not in `git diff --name-only HEAD`). Otherwise change nothing: name the files that differ, and let the user check out the head, or commit or stash their edits, first.
+
+Fix confirmed critical, high and medium findings: trivial ones yourself, larger ones through `bosun:implementer` in shared mode (no `isolation`, with the files it owns), so fixes land uncommitted in the working tree. Re-run the checks (long output into a log you tail: `set -o pipefail; log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)`; if the tail doesn't show the cause, grep or read more of that log), then re-review only the changed areas with a `bosun:code-reviewer` (or `bosun:security-reviewer`) using the lens that raised each finding. Don't commit unless the user asks (`/bosun:commit`).

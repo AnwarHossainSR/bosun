@@ -1,6 +1,6 @@
 ---
 name: review
-description: Multi-agent review of local changes (branch, staged, working tree, range, commit) through parallel lenses, with verified, de-duplicated findings; --fix applies them. Use before a commit or PR.
+description: Multi-lens review of local changes (branch, staged, working tree, range, commit) with verified findings; --fix applies them. Use before a commit or PR.
 argument-hint: "[staged | working | <base>...<head> | <commit>] [--lenses correctness,tests,security,...] [--fix]"
 ---
 
@@ -34,7 +34,7 @@ Unless `--lenses` is given:
 - `performance` for data access, loops over collections, hot paths, rendering;
 - `accessibility` for UI changes; `api-compat` for public API, schema or config changes.
 
-Split by size: under about 300 changed lines and at most 25 files, one `bosun:code-reviewer` takes every lens but security; up to about 1,500 lines and 25 files, one reviewer per lens; larger, or more than 25 files, split by area (directory or module) too, one reviewer per lens and area, up to the parallel cap. Tell the user how many reviewers will run.
+Split by size: under about 600 changed lines and at most 25 files, one `bosun:code-reviewer` takes every lens but security (each extra reviewer reads the same diff and files again); up to about 1,500 lines and 25 files, one reviewer per lens; larger, or more than 25 files, split by area (directory or module) too, one reviewer per lens and area, up to the parallel cap. Tell the user how many reviewers will run.
 
 ## 4. Review in parallel
 
@@ -62,6 +62,4 @@ Be specific and calm; no padding, no filler praise.
 
 ## 7. --fix
 
-Fixes land in the working tree, so every file a fix touches must hold exactly the reviewed code there. The default target and `working` always do. `staged`: the index must still be the reviewed one (`git write-tree` equals the tree recorded in the report) and the file must have no unstaged changes (not in `git diff --name-only`). A range or commit: its head must be `HEAD` (`git rev-parse <head>^{commit}` equals `git rev-parse HEAD`; `^{commit}` makes annotated tags compare as their commit) and the file must have no uncommitted changes (not in `git diff --name-only HEAD`). Otherwise change nothing: name the files that differ, and let the user check out the head, or commit or stash their edits, first.
-
-Fix confirmed critical, high and medium findings: trivial ones yourself, larger ones through `bosun:implementer` in shared mode (no `isolation`, with the files it owns), so fixes land uncommitted in the working tree. Re-run the checks (long output into a log you tail: `set -o pipefail; log=$(mktemp); echo "log: $log"; <cmd> >"$log" 2>&1; code=$?; tail -n 40 "$log"; echo "exit $code"; (exit $code)`; if the tail doesn't show the cause, grep or read more of that log), then re-review only the changed areas with a `bosun:code-reviewer` (or `bosun:security-reviewer`) using the lens that raised each finding. Don't commit unless the user asks (`/bosun:commit`).
+Only with `--fix`: read `${CLAUDE_PLUGIN_ROOT}/skills/review/reference/fix.md` and follow it.

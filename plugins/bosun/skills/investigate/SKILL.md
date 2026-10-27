@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: Root-cause a bug, failing or flaky test, incident, regression or "why does X happen" with parallel hypothesis tests and verification; report with fix options, --fix fixes test-first. Use for debugging.
+description: Root-cause a bug, failing or flaky test, regression or incident with parallel hypothesis tests; --fix fixes it test-first. Use for debugging.
 argument-hint: "<symptom, error message, failing test or issue link> [--fix]"
 ---
 
@@ -32,7 +32,7 @@ Unfamiliar area: 1-2 `bosun:scout` agents in parallel to map the code path and t
 
 ## 5. Investigate in parallel
 
-In one message, one `bosun:investigator` per top hypothesis (up to the parallel cap). Each prompt: the frame, the repro, its hypothesis, the competing hypotheses (so it hunts for evidence that tells them apart), and what would confirm or refute it.
+A hypothesis one quick command or file read can settle: check it yourself first. Then, in one message, one `bosun:investigator` per remaining top hypothesis, at most 3 (or the parallel cap, if lower). Each prompt: the frame, the repro, its hypothesis, the competing hypotheses (so it hunts for evidence that tells them apart), and what would confirm or refute it.
 
 Give an investigator `isolation: "worktree"` when it may instrument code, run `git bisect`, or run experiments that would disturb the main checkout. Otherwise run it without isolation and tell it to write only to a temp directory or `.bosun/scratch/`.
 

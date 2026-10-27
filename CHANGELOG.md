@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-27
+
+### Changed
+- Lower token use, measured with `claude plugin details bosun` (estimates):
+  - **Always-on:** about 1,420 → 1,021 tokens per session, from shorter skill and agent descriptions.
+  - **Builds:** the build skill is about 8.8k → 8.2k tokens. Its review gates no longer load the whole review skill (about 3k tokens) to get the lockfile pathspecs: the build carries its own copy, and a test keeps the two lists equal. The crew route moved to `reference/crew.md`, read only by crew builds.
+  - **Reviews:** the review skill is about 3.4k → 3.0k tokens, because `--fix` moved to `reference/fix.md`, read only with `--fix`. `/bosun:review-pr` reads it too, and now fetches existing comments with their bodies cut to 300 characters, since review bots post long ones.
+  - **Plans:** the architect is about 4.1k → 3.9k tokens per spawn; the classic PLAN.md outline moved to `templates/PLAN.md`.
+  - **Fewer agents:** one reviewer now covers every lens but security for a diff of up to about 600 changed lines (was 300), and a build gate up to about 400 (was 200). Each extra reviewer read the same diff and files again. `/bosun:investigate` checks a hypothesis it can settle with one quick command itself, and starts at most 3 investigators.
+- The README is shorter: highlights, quick start, commands and install. The details moved to [docs/guide.md](docs/guide.md).
+
+### Added
+- Install steps for a new repository in the README: prerequisites, the three install scopes, setup, check, update and remove.
+- A workflow, `sync-dev-after-main-merge.yml`, that brings `dev` up to date after a pull request merges into `main`. When `dev` has no work of its own, it resets `dev` onto `main`; otherwise it merges `main` into `dev`, and fails on a conflict.
+
 ## [0.6.0] - 2026-10-23
 
 ### Added

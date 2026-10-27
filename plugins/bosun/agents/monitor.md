@@ -1,6 +1,6 @@
 ---
 name: monitor
-description: Read-only health audit of a running bosun build (stalls, failures, blocked chains, orphaned worktrees, drift) with what to do.
+description: Read-only health check of a running bosun build, with what to do next.
 tools: Read, Grep, Glob, Bash
 model: haiku
 color: cyan
