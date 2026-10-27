@@ -12,7 +12,8 @@ All notable changes to this project are documented here. The format follows [Kee
   - a critique and threat model run only with `--critique` or `--crew`, or when you ask for one at approval, which names the security-sensitive tasks and offers it;
   - the build's security review still checks security-sensitive tasks;
   - scouts run only for large work (a new product, or several subsystems at once) or with `--crew`;
-  - the plan skill reads only the repository's overview itself and leaves the code to the architect.
+  - the plan skill reads only the repository's overview itself and leaves the code to the architect;
+  - the architect plans only the requested scope. Infrastructure, secrets, hardening and follow-ups the request doesn't ask for become one-line open questions, and their code isn't read.
 - `/bosun:propose` and `/bosun:apply` say once when the session's context is over about 100k tokens, because every later turn re-reads it and a fresh session is cheaper.
 - Lower token use, measured with `claude plugin details bosun` (estimates):
   - **Always-on:** about 1,420 → 1,021 tokens per session, from shorter skill and agent descriptions.
