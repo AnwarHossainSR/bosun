@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-27
+
+### Changed
+- **You can run bosun's agents on a cheaper model.** Seven agents set `model: inherit`, which in Claude Code outranks the `CLAUDE_CODE_SUBAGENT_MODEL` setting (checked in 2.1.306's code), so that setting couldn't move them. Without the line they still use the session's model, unless you set `CLAUDE_CODE_SUBAGENT_MODEL`, for example to `sonnet`. `/bosun:setup` offers this, and a test keeps the line out.
+- **Fewer agents in reviews and builds:**
+  - reviews and security audits send a finding to the verifier only when the reviewer didn't already run or trace it, and when one file read or command can't settle it;
+  - a build's final review checks correctness and the spec when every merge was already gated (policy `task`), and adds design and tests only for `batch` and `final`;
+  - a build runs a full security audit only when a security-sensitive task merged without a security review;
+  - `/bosun:ship` reviews only the commits after the branch's last bosun review, and none when they change only docs.
+
 ## [0.6.1] - 2026-10-27
 
 ### Changed

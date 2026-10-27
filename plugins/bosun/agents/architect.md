@@ -2,7 +2,6 @@
 name: architect
 description: Writes, critiques and revises bosun plans - OpenSpec changes and task boards.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
-model: inherit
 effort: high
 color: purple
 ---

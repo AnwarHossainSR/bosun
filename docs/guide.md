@@ -112,7 +112,7 @@ Every agent ends with a short `# BOSUN-RESULT` block that the manager acts on.
 
 **What each run cost.** Review, review-pr, security-audit, investigate, plan and build end with token lines read from Claude Code's own transcript files: this run and its agents, the whole session, and how much of the context window is left. Agents' output counts are a lower bound (their transcripts often keep only a reply's first count), and the window size is inferred from the model unless you set `CLAUDE_CODE_MAX_CONTEXT_TOKENS`. Plan limits aren't in those files; `/usage` shows them.
 
-**Spending less.** Start bosun in a fresh session (`/clear`): the manager re-reads its whole context on every turn, and plan and build warn when it's over about 100k tokens. A lower effort level for the session cuts the manager's thinking. A crew build still does much more work than a single session: try `--solo` when the board allows it, lower `build.max_parallel`, use `build.review: batch`, or run implementers on `sonnet`.
+**Spending less.** Start bosun in a fresh session (`/clear`): the manager re-reads its whole context on every turn, and plan and build warn when it's over about 100k tokens. A lower effort level for the session cuts the manager's thinking. To run bosun's agents on Sonnet, which costs less per token than Opus, add `{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }` to `.claude/settings.local.json` (`/bosun:setup` offers it). It applies to every subagent in the project that doesn't pin its own model; scout and docs-writer already run on Sonnet and monitor on Haiku. A crew build still does much more work than a single session: try `--solo` when the board allows it, lower `build.max_parallel`, or use `build.review: batch`.
 
 ## Configuration
 
