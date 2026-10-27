@@ -66,10 +66,6 @@ A build runs many git and task-board commands. Explain the options instead of ch
 
 Write permission rules only if the user asks.
 
-## 7. Lower cost (optional)
-
-bosun's agents that don't pin a model (architect, implementer, test-engineer, reviewers, verifier, investigator) run on the session's model. Offer to run them, and any other subagent without its own model, on Sonnet in this project: it costs less per token than Opus and may be weaker on hard plans and reviews. Write it only on a yes, with the same kind of merge as step 4: `python3 -c 'import json, os; p = ".claude/settings.local.json"; d = json.load(open(p)) if os.path.exists(p) else {}; d.setdefault("env", {})["CLAUDE_CODE_SUBAGENT_MODEL"] = "sonnet"; os.makedirs(".claude", exist_ok=True); json.dump(d, open(p, "w"), indent=2)'`. It applies from the next session.
-
-## 8. Summary
+## 7. Summary
 
 List what was written or changed. With `planning.openspec_dir` set to `.bosun/openspec`, run `git check-ignore -v .bosun/openspec/changes` and show the rule it prints; nothing printed means the folder isn't local: fix the ignore rule before any planning. Next steps: `/bosun:plan <idea>` for a new product or feature, `/bosun:manager <goal>` for anything else.

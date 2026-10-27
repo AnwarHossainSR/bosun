@@ -2,6 +2,8 @@
 name: implementer
 description: Implements a scoped code task end to end - tests, checks, a commit - and reports a BOSUN-RESULT.
 tools: Read, Grep, Glob, Bash, Edit, Write, TodoWrite, WebFetch, WebSearch
+model: opus
+effort: high
 color: blue
 ---
 

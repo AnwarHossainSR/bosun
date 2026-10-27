@@ -2,6 +2,7 @@
 name: security-reviewer
 description: Read-only security reviewer for diffs, audits and threat models, with verified findings.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
+model: opus
 effort: high
 color: red
 ---

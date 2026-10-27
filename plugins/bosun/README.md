@@ -6,7 +6,7 @@ Full documentation: <https://github.com/AnwarHossainSR/bosun#readme>
 
 ## What it adds
 
-- **14 skills**: `manager`, `plan`, `build`, `status`, `archive`, `investigate`, `review`, `review-pr`, `security-audit`, `commit`, `ship`, `setup`, and `propose` and `apply`, OpenSpec's names for `plan` and `build`. `ship`, `setup`, `archive`, `propose` and `apply` run only when you type them.
+- **14 skills**: `manager`, `plan`, `build`, `status`, `archive`, `investigate`, `review`, `review-pr`, `security-audit`, `commit`, `ship`, `setup`, and `propose` and `apply`, OpenSpec's names for `plan` and `build`. `ship`, `setup`, `archive`, `status`, `propose` and `apply` run only when you type them.
 - **10 agents**: architect, scout, implementer, test-engineer, docs-writer, code-reviewer, security-reviewer, verifier, investigator, monitor.
 - **4 hooks**, which act only on bosun's own agents (`agent_type` starting with `bosun:`): a guard before Bash and file edits; the project profile and output style when an agent starts; and, when it stops or hands back its report, an activity log entry plus a copy of the report next to its plan (`.bosun/plans/<name>/results/`, or `.bosun/results/`).
 

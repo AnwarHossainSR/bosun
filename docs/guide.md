@@ -20,7 +20,7 @@ The details behind the [README](../README.md): every command, how plans and buil
 | `/bosun:manager <goal>` | Routes any goal to the lightest workflow, from a single agent to a full crew. |
 | `/bosun:propose <idea \| #issue>` (or `/bosun:plan`) | Clarifying questions, an OpenSpec change and a task board, then your approval. One architect writes it, as OpenSpec's propose does; `--crew` adds scouts and a critique round with a threat model, `--critique` just the critique, and `--solo` or `--crew` carries over to the build. `--classic` writes a PLAN.md instead. |
 | `/bosun:apply [plan]` (or `/bosun:build`) | Builds the board solo or with parallel agents in worktrees, with review-gated merges and resume (`--solo`, `--crew`, `--resume`, `--parallel N`, `--only 1.1,2.3`, `--dry-run`). Shows progress as OpenSpec's apply does (`✓ 1.2 · 3/7`). An OpenSpec change without a board gets one first. |
-| `/bosun:status [--audit]` | Progress, work in flight, blocked tasks and what's next; `--audit` adds a health check. |
+| `/bosun:status [--audit]` | Progress, work in flight, blocked tasks and what's next; `--audit` adds a health check. Runs only when you type it. |
 | `/bosun:review [target]` | Lens review of the branch, staged or working changes, a range or a commit; `--fix` applies confirmed fixes. |
 | `/bosun:review-pr <n \| url>` | The same review on a GitHub pull request, in a separate worktree. Posts only text you approve. |
 | `/bosun:investigate <symptom>` | Competing hypotheses tested in parallel, a verified root cause and a report; `--fix` fixes it test-first. |
@@ -103,6 +103,8 @@ Every agent ends with a short `# BOSUN-RESULT` block that the manager acts on.
 
 ## Token use
 
+**Models.** The work that needs judgment runs on the latest Opus (`model: opus`, effort `high`): architect, implementer, test-engineer, code-reviewer, security-reviewer, verifier and investigator. The rest runs on Haiku: scout, docs-writer and monitor, plus `/bosun:status` and `/bosun:archive`, which switch the session to Haiku for their turn. That works on Claude Code 2.1.259 and later; in auto mode, Claude Code keeps the session's model for a skill whose model doesn't support auto mode. Change an agent's model in its `plugins/bosun/agents/<name>.md`.
+
 - **About 1k tokens per session** for the skill and agent listings (`claude plugin details bosun` shows the estimate). Turn bosun off in projects that don't use it with `/plugin`.
 - **Only what a run needs.** Rarely used instructions (the crew route, review fixes, resume, the classic plan outline) load only when that path runs.
 - **Right-sized work.** A lean plan has one architect and a solo build one implementer and one review. Reviews and investigations start no more agents than the change needs.
@@ -112,7 +114,7 @@ Every agent ends with a short `# BOSUN-RESULT` block that the manager acts on.
 
 **What each run cost.** Review, review-pr, security-audit, investigate, plan and build end with token lines read from Claude Code's own transcript files: this run and its agents, the whole session, and how much of the context window is left. Agents' output counts are a lower bound (their transcripts often keep only a reply's first count), and the window size is inferred from the model unless you set `CLAUDE_CODE_MAX_CONTEXT_TOKENS`. Plan limits aren't in those files; `/usage` shows them.
 
-**Spending less.** Start bosun in a fresh session (`/clear`): the manager re-reads its whole context on every turn, and plan and build warn when it's over about 100k tokens. A lower effort level for the session cuts the manager's thinking. To run bosun's agents on Sonnet, which costs less per token than Opus, add `{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }` to `.claude/settings.local.json` (`/bosun:setup` offers it). It applies to every subagent in the project that doesn't pin its own model; scout and docs-writer already run on Sonnet and monitor on Haiku. A crew build still does much more work than a single session: try `--solo` when the board allows it, lower `build.max_parallel`, or use `build.review: batch`.
+**Spending less.** Start bosun in a fresh session (`/clear`): the manager re-reads its whole context on every turn, and plan and build warn when it's over about 100k tokens. A lower effort level for the session cuts the manager's thinking. A crew build still does much more work than a single session: try `--solo` when the board allows it, lower `build.max_parallel`, or use `build.review: batch`.
 
 ## Configuration
 

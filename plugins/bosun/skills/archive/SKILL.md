@@ -3,6 +3,7 @@ name: archive
 description: Archive a finished OpenSpec change into the main specs, after checks and your confirmation.
 argument-hint: "[change-id] [--yes]"
 disable-model-invocation: true
+model: haiku
 ---
 
 # bosun archive

@@ -528,10 +528,21 @@ class PromptConsistencyTests(unittest.TestCase):
         self.assertEqual(len(review), 1)
         self.assertEqual(build, review)
 
-    def test_agents_leave_the_model_to_the_user(self):
-        # `model: inherit` outranks CLAUDE_CODE_SUBAGENT_MODEL, so it would stop users moving agents to a cheaper model.
-        for path in sorted((ROOT / "plugins" / "bosun" / "agents").glob("*.md")):
-            self.assertNotIn("\nmodel: inherit\n", path.read_text(), path.name)
+    def test_models_match_the_work(self):
+        # Planning, building, reviewing and investigating run on the latest Opus; mapping, docs, health checks,
+        # status and archive on Haiku. A skill's model switches the main session for the turn, so a Haiku skill
+        # must be one only the user starts.
+        plugin = ROOT / "plugins" / "bosun"
+        want = {"architect": "opus", "implementer": "opus", "test-engineer": "opus", "code-reviewer": "opus",
+                "security-reviewer": "opus", "verifier": "opus", "investigator": "opus",
+                "scout": "haiku", "docs-writer": "haiku", "monitor": "haiku"}
+        for name, model in want.items():
+            head = (plugin / "agents" / f"{name}.md").read_text().split("\n---\n", 1)[0]
+            self.assertIn(f"\nmodel: {model}\n", head + "\n", name)
+        for path in sorted(plugin.glob("skills/*/SKILL.md")):
+            head = path.read_text().split("\n---\n", 1)[0] + "\n"
+            if "\nmodel: " in head:
+                self.assertIn("\ndisable-model-invocation: true\n", head, path.parent.name)
 
     def test_files_skills_read_on_demand_exist(self):
         plugin = ROOT / "plugins" / "bosun"

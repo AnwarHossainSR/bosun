@@ -7,7 +7,12 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [0.6.2] - 2026-10-27
 
 ### Changed
-- **You can run bosun's agents on a cheaper model.** Seven agents set `model: inherit`, which in Claude Code outranks the `CLAUDE_CODE_SUBAGENT_MODEL` setting (checked in 2.1.306's code), so that setting couldn't move them. Without the line they still use the session's model, unless you set `CLAUDE_CODE_SUBAGENT_MODEL`, for example to `sonnet`. `/bosun:setup` offers this, and a test keeps the line out.
+- **Models matched to the work.**
+  - The latest Opus (`model: opus`, effort `high`) runs the architect, implementer, test-engineer, code-reviewer, security-reviewer, verifier and investigator. Before, they inherited the session's model and, for the implementer and test-engineer, its effort, so a session on "Extra high" ran them on Extra high too.
+  - Haiku runs the scout and the docs-writer (both were Sonnet) and the monitor.
+  - `/bosun:status` and `/bosun:archive` run on Haiku. A skill's model switches the session for its turn, on Claude Code 2.1.259 and later; in auto mode, Claude Code keeps the session's model for a skill whose model doesn't support it.
+  - `/bosun:status` now runs only when you type it, so a Haiku turn can't start in the middle of another workflow. The manager reads the task board itself instead.
+  - A test checks each agent's model, and that a skill with its own model is one only you start.
 - **Fewer agents in reviews and builds:**
   - reviews and security audits send a finding to the verifier only when the reviewer didn't already run or trace it, and when one file read or command can't settle it;
   - a build's final review checks correctness and the spec when every merge was already gated (policy `task`), and adds design and tests only for `batch` and `final`;

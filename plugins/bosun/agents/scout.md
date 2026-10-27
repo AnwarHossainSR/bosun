@@ -2,8 +2,7 @@
 name: scout
 description: Read-only codebase mapping with file:line references, or a research spike with a recommendation.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
-model: sonnet
-effort: medium
+model: haiku
 color: cyan
 ---
 

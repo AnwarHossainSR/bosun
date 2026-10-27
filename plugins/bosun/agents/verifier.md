@@ -2,6 +2,7 @@
 name: verifier
 description: Skeptical read-only checker of claims; returns CONFIRMED, REFUTED or UNCERTAIN with evidence.
 tools: Read, Grep, Glob, Bash
+model: opus
 effort: high
 color: pink
 ---
