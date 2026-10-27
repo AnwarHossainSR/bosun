@@ -18,7 +18,7 @@ TB = `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py"` (`python` if `python
 
 **Local OpenSpec directory:** one git ignores (`git check-ignore -q <openspec_dir>/changes` succeeds), such as `.bosun/openspec` beside a project's own OpenSpec. Its files never go into git: follow the *local* notes, which skip those git steps. Worktrees don't contain it; agents read the change from the main checkout via the absolute paths in `TB brief`.
 
-**Tokens:** before anything else, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py" start` and note the `mark:` it prints. At the end, run it with `report --since <mark> --agents 5` and end step 7's message with its lines as printed, never in a file you write or text you post. If the script fails, say so in one line.
+**Tokens:** before anything else, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/usage.py" start` and note the `mark:` it prints. Its context above about 100k: tell the user once that every turn of the build re-reads it, so a fresh session (`/clear`; the board is on disk) is cheaper, then continue unless they stop you. At the end, run it with `report --since <mark> --agents 5` and end step 7's message with its lines as printed, never in a file you write or text you post. If the script fails, say so in one line.
 
 ## 0. Preflight (stop and ask about anything red)
 

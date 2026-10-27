@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [0.7.0] - 2026-10-27
 
 ### Changed
+- **Plans are lean by default, security-sensitive ones included,** as OpenSpec's propose is: one architect writes the plan, with no scouts, critique or threat model. Before, auth, sessions, input parsing and the like forced a full plan. In one real run, a sign-in page with a mock session token got a design, a critique and a threat model (the agent map showed about 485k tokens across the three) and a 14-task board. Now:
+  - the architect writes the failure and authorization scenarios itself, keeps a lean board within the solo limits (at most 8 tasks), finds code with Grep and Glob, and needs a reason to read far more than about 20 files;
+  - a critique and threat model run only with `--critique` or `--crew`, or when you ask for one at approval, which names the security-sensitive tasks and offers it;
+  - the build's security review still checks security-sensitive tasks;
+  - scouts run only for large work (a new product, or several subsystems at once) or with `--crew`;
+  - the plan skill reads only the repository's overview itself and leaves the code to the architect.
+- `/bosun:propose` and `/bosun:apply` say once when the session's context is over about 100k tokens, because every later turn re-reads it and a fresh session is cheaper.
 - Lower token use, measured with `claude plugin details bosun` (estimates):
   - **Always-on:** about 1,420 → 1,021 tokens per session, from shorter skill and agent descriptions.
   - **Builds:** the build skill is about 8.8k → 8.2k tokens. Its review gates no longer load the whole review skill (about 3k tokens) to get the lockfile pathspecs: the build carries its own copy, and a test keeps the two lists equal. The crew route moved to `reference/crew.md`, read only by crew builds.

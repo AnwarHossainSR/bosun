@@ -18,7 +18,7 @@ The details behind the [README](../README.md): every command, how plans and buil
 | Command | What it does |
 |---|---|
 | `/bosun:manager <goal>` | Routes any goal to the lightest workflow, from a single agent to a full crew. |
-| `/bosun:propose <idea \| #issue>` (or `/bosun:plan`) | Clarifying questions, an OpenSpec change and a task board, then your approval. Large or security-sensitive work also gets scouts and a critique round; `--solo` skips them, `--crew` adds them, and the flag carries over to the build. `--classic` writes a PLAN.md instead. |
+| `/bosun:propose <idea \| #issue>` (or `/bosun:plan`) | Clarifying questions, an OpenSpec change and a task board, then your approval. One architect writes it, as OpenSpec's propose does; `--crew` adds scouts and a critique round with a threat model, `--critique` just the critique, and `--solo` or `--crew` carries over to the build. `--classic` writes a PLAN.md instead. |
 | `/bosun:apply [plan]` (or `/bosun:build`) | Builds the board solo or with parallel agents in worktrees, with review-gated merges and resume (`--solo`, `--crew`, `--resume`, `--parallel N`, `--only 1.1,2.3`, `--dry-run`). Shows progress as OpenSpec's apply does (`✓ 1.2 · 3/7`). An OpenSpec change without a board gets one first. |
 | `/bosun:status [--audit]` | Progress, work in flight, blocked tasks and what's next; `--audit` adds a health check. |
 | `/bosun:review [target]` | Lens review of the branch, staged or working changes, a range or a commit; `--fix` applies confirmed fixes. |
@@ -50,7 +50,7 @@ openspec/
 - Only the architect edits the spec; other agents report disagreements as `spec_gaps`.
 - `/bosun:archive` merges the finished change into the main specs with the [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec).
 
-Small and medium work gets a lean plan: the architect alone reads the code it needs, with no scouts and no critique round. Large or security-sensitive work gets scouts, a critique and a threat model.
+Plans are lean by default, security-sensitive ones included: the architect alone reads the code it needs, with no scouts and no critique round, and writes the failure and authorization scenarios itself. Only large work (a new product, or several subsystems at once) gets scouts. A critique and threat model run only when you ask (`--critique`, `--crew`, or when the plan is shown to you); either way, the build's security review checks security-sensitive tasks.
 
 **Already using OpenSpec for your own work?** Give bosun its own git-ignored folder, so your specs stay yours. `/bosun:setup` offers this when it finds an `openspec/` folder that isn't bosun's:
 
@@ -112,7 +112,7 @@ Every agent ends with a short `# BOSUN-RESULT` block that the manager acts on.
 
 **What each run cost.** Review, review-pr, security-audit, investigate, plan and build end with token lines read from Claude Code's own transcript files: this run and its agents, the whole session, and how much of the context window is left. Agents' output counts are a lower bound (their transcripts often keep only a reply's first count), and the window size is inferred from the model unless you set `CLAUDE_CODE_MAX_CONTEXT_TOKENS`. Plan limits aren't in those files; `/usage` shows them.
 
-A crew build still does much more work than a single session. Start with a small plan to see the flow; to spend less on a big one, try `--solo` when the board allows it, lower `build.max_parallel`, use `build.review: batch`, or run implementers on `sonnet`.
+**Spending less.** Start bosun in a fresh session (`/clear`): the manager re-reads its whole context on every turn, and plan and build warn when it's over about 100k tokens. A lower effort level for the session cuts the manager's thinking. A crew build still does much more work than a single session: try `--solo` when the board allows it, lower `build.max_parallel`, use `build.review: batch`, or run implementers on `sonnet`.
 
 ## Configuration
 
