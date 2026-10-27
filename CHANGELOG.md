@@ -15,6 +15,12 @@ All notable changes to this project are documented here. The format follows [Kee
   - the plan skill reads only the repository's overview itself and leaves the code to the architect;
   - the architect plans only the requested scope. Infrastructure, secrets, hardening and follow-ups the request doesn't ask for become one-line open questions, and their code isn't read.
 - `/bosun:propose` and `/bosun:apply` say once when the session's context is over about 100k tokens, because every later turn re-reads it and a fresh session is cheaper.
+- **You can run bosun's agents on a cheaper model.** Seven agents set `model: inherit`, which in Claude Code outranks the `CLAUDE_CODE_SUBAGENT_MODEL` setting (checked in 2.1.306's code), so that setting couldn't move them. Without the line they still use the session's model, unless you set `CLAUDE_CODE_SUBAGENT_MODEL`, for example to `sonnet`. `/bosun:setup` offers this, and a test keeps the line out.
+- **Fewer agents in reviews and builds:**
+  - reviews and security audits send a finding to the verifier only when the reviewer didn't already run or trace it, and when one file read or command can't settle it;
+  - a build's final review checks correctness and the spec when every merge was already gated (policy `task`), and adds design and tests only for `batch` and `final`;
+  - a build runs a full security audit only when a security-sensitive task merged without a security review;
+  - `/bosun:ship` reviews only the commits after the branch's last bosun review, and none when they change only docs.
 - Lower token use, measured with `claude plugin details bosun` (estimates):
   - **Always-on:** about 1,420 → 1,021 tokens per session, from shorter skill and agent descriptions.
   - **Builds:** the build skill is about 8.8k → 8.2k tokens. Its review gates no longer load the whole review skill (about 3k tokens) to get the lockfile pathspecs: the build carries its own copy, and a test keeps the two lists equal. The crew route moved to `reference/crew.md`, read only by crew builds.

@@ -43,7 +43,7 @@ In one message, spawn the `bosun:code-reviewer` agents and, for the security len
 ## 5. Merge and verify
 
 - De-duplicate: the same location and root cause make one finding; note which lenses agreed (agreement raises confidence).
-- Verify: every critical and high finding, and every medium one with low confidence, goes to `bosun:verifier` (batched into one or two calls). Drop REFUTED findings; keep UNCERTAIN ones, labelled.
+- Verify every critical and high finding, and every medium one with low confidence, except those the reviewer gave high confidence (it ran or traced them end to end). One that a single file read or command settles: check it yourself. The rest go to `bosun:verifier` in one call (two for many). Drop REFUTED findings; keep UNCERTAIN ones, labelled.
 
 ## 6. Report
 

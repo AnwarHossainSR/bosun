@@ -2,7 +2,6 @@
 name: test-engineer
 description: Writes deterministic unit, integration and end-to-end tests for a module, feature or bug.
 tools: Read, Grep, Glob, Bash, Edit, Write, TodoWrite, WebFetch
-model: inherit
 color: green
 ---
 

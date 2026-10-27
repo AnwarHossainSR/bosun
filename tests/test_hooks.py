@@ -528,6 +528,11 @@ class PromptConsistencyTests(unittest.TestCase):
         self.assertEqual(len(review), 1)
         self.assertEqual(build, review)
 
+    def test_agents_leave_the_model_to_the_user(self):
+        # `model: inherit` outranks CLAUDE_CODE_SUBAGENT_MODEL, so it would stop users moving agents to a cheaper model.
+        for path in sorted((ROOT / "plugins" / "bosun" / "agents").glob("*.md")):
+            self.assertNotIn("\nmodel: inherit\n", path.read_text(), path.name)
+
     def test_files_skills_read_on_demand_exist(self):
         plugin = ROOT / "plugins" / "bosun"
         for path in sorted(plugin.glob("skills/*/SKILL.md")) + sorted(plugin.glob("agents/*.md")):

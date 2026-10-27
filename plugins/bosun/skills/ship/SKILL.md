@@ -26,7 +26,7 @@ The commands from `.bosun/config.json`, or the ones you detect: lint, typecheck,
 
 ## 3. Quick review
 
-Skip with `--no-review`, or when `.bosun/reviews/` already has a review of this exact HEAD sha. Otherwise run the `bosun:review` skill on `<remote>/<base>...HEAD` with lenses correctness and security. Critical or high findings: stop and report them.
+Skip with `--no-review`, or when `.bosun/reviews/` already has a review of this exact HEAD sha. Otherwise run the `bosun:review` skill with lenses correctness and security on `<remote>/<base>...HEAD`. When `.bosun/reviews/` has a review of the whole branch (the default target or a build's final review: its range line starts at the base) at an earlier sha (`git merge-base --is-ancestor <sha> HEAD` succeeds), review only `<sha>..HEAD` instead, and skip it when those commits change only docs (`*.md` and `docs/`). Critical or high findings: stop and report them.
 
 ## 4. Write the PR
 

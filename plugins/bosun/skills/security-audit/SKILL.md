@@ -35,7 +35,7 @@ In one message, spawn the `bosun:security-reviewer` agents, mode `audit` with `-
 
 ## 4. Verify
 
-Every critical and high finding, and any medium one with low confidence, goes to `bosun:verifier`. Reproduction happens only locally (unit level, or against a server started on localhost), never against shared or production systems.
+Every critical and high finding, and any medium one with low confidence, is verified: one that a single file read or command settles, by you; the rest by `bosun:verifier`, in one call. Reproduction happens only locally (unit level, or against a server started on localhost), never against shared or production systems.
 
 ## 5. Report
 
