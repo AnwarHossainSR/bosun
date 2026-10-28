@@ -24,7 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 STATUSES = ("pending", "in_progress", "review", "done", "blocked", "failed", "skipped")
 FINISHED = frozenset({"done", "skipped"})
 INFLIGHT = frozenset({"in_progress", "review"})

@@ -31,7 +31,7 @@ Pick the lightest workflow that does the job well, tell the user in one line whi
 | Many similar, independent changes (migration, codemod, rename, tests or docs per module, lint cleanup per directory) | Ad-hoc crew, section 2. |
 | Research, exploring how something works, or a choice between options | 2-4 `bosun:scout` agents in parallel on distinct angles, then synthesize; verify key claims. |
 | Small, clear change (3 files or fewer) | Do it yourself, or one `bosun:implementer` plus one `bosun:code-reviewer`. No crew. |
-| Progress of a running build | `bosun:status`. |
+| Progress of a running build | `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/taskboard.py" status <board>` yourself, or suggest `/bosun:status`. |
 
 Invoke skills with the Skill tool and pass the goal through. Ambiguous in a way that changes the route or the result: first ask up to three focused questions, each with a recommended default.
 

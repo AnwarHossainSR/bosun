@@ -2,7 +2,7 @@
 name: investigator
 description: Tests one bug hypothesis with experiments; reports CONFIRMED, REFUTED or INCONCLUSIVE. Never ships fixes.
 tools: Read, Grep, Glob, Bash, Edit, Write, WebSearch, WebFetch
-model: inherit
+model: opus
 effort: high
 color: yellow
 ---

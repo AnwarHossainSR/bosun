@@ -2,7 +2,7 @@
 name: code-reviewer
 description: Read-only diff reviewer through one or more lenses, with evidence-backed findings and fixes.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: opus
 effort: high
 color: orange
 ---

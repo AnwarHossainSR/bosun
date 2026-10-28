@@ -2,8 +2,7 @@
 name: docs-writer
 description: Updates READMEs, guides, CHANGELOGs and comments to match the code.
 tools: Read, Grep, Glob, Bash, Edit, Write
-model: sonnet
-effort: medium
+model: haiku
 color: yellow
 ---
 

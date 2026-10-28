@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-27
+
+### Changed
+- **Models matched to the work.**
+  - The latest Opus (`model: opus`, effort `high`) runs the architect, implementer, test-engineer, code-reviewer, security-reviewer, verifier and investigator. Before, they inherited the session's model and, for the implementer and test-engineer, its effort, so a session on "Extra high" ran them on Extra high too.
+  - Haiku runs the scout and the docs-writer (both were Sonnet) and the monitor.
+  - `/bosun:status` and `/bosun:archive` run on Haiku. A skill's model switches the session for its turn, on Claude Code 2.1.259 and later; in auto mode, Claude Code keeps the session's model for a skill whose model doesn't support it.
+  - `/bosun:status` now runs only when you type it, so a Haiku turn can't start in the middle of another workflow. The manager reads the task board itself instead.
+  - A test checks each agent's model, and that a skill with its own model is one only you start.
+- **Fewer agents in reviews and builds:**
+  - reviews and security audits send a finding to the verifier only when the reviewer didn't already run or trace it, and when one file read or command can't settle it;
+  - a build's final review checks correctness and the spec when every merge was already gated (policy `task`), and adds design and tests only for `batch` and `final`;
+  - a build runs a full security audit only when a security-sensitive task merged without a security review;
+  - `/bosun:ship` reviews only the commits after the branch's last bosun review, and none when they change only docs.
+
 ## [0.6.1] - 2026-10-27
 
 ### Changed
